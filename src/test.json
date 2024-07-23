@@ -1,0 +1,26 @@
+{\"battery\" : \" 87\", \"error_log\" : \"none\", \"goallist\" : {\"tray1\" : \"non\", \"tray2\" : \"non\", \"tray3\" : \"non\" , \"tray4\" : \"non\" }, \"neartable\" : \"2\", \"next\" : \" non\", \"nodeid\" : \"22\", \"progress\" : \"0.000000\", \"ready2work\" : \"ready\", \"robotname\" : \"servinggo\", \"status\" : \"non\", \"to\" : \"1\", \"type\" : \"stop\", \"ur_drivDist\" : \"3379.758374\", \"ur_numDeliv\" : \"380.000000\", \"ur_opMode\" : \"2\", \"ur_opTime\" : \"71.617262\", \"ur_voltage\" : \"0.000000\"\n}\n
+
+{\"battery\" : \" 87\", \"error_log\" : \"none\", \"goallist\" : {\"tray1\" : \"non\", \"tray2\" : \"non\", \"tray3\" : \"non\" , \"tray4\" : \"non\" }, \"neartable\" : \"2\", \"next\" : \" non\", \"nodeid\" : \"22\", \"progress\" : \"0.000000\", \"ready2work\" : \"ready\", \"robotname\" : \"servinggo\", \"status\" : \"non\", \"to\" : \"1\", \"type\" : \"stop\"}
+
+{"battery" : 87, "error_log" : "none", "goallist" : { "tray1" : "non", "tray2" : "non", "tray3" : "non" , "tray4" : "non" }, "neartable" : "2", "next" : "non", "nodeid" : "22", "progress" : "0.000000", "ready2work" : "ready", "robotname" : "servinggo", "status" : "non", "to" : "1", "type" : "stop"}
+
+
+rostopic pub /navistatus std_msgs/String "data: '{"battery" : 87, "error_log" : "none", "goallist" : { "tray1" : "non", "tray2" : "non", "tray3" : "non" , "tray4" : "non" }, "neartable" : "2", "next" : "non", "nodeid" : "22", "progress" : "0.000000", "ready2work" : "ready", "robotname" : "servinggo", "status" : "non", "to" : "1", "type" : "stop"}'" 
+
+rostopic pub /navistatus std_msgs/String "data: '{\"battery\" : \" 87\", \"error_log\" : \"none\", \"goallist\" : {\"tray1\" : \"non\", \"tray2\" : \"non\", \"tray3\" : \"non\" , \"tray4\" : \"non\" }, \"neartable\" : \"2\", \"next\" : \" non\", \"nodeid\" : \"22\", \"progress\" : \"0.000000\", \"ready2work\" : \"ready\", \"robotname\" : \"servinggo\", \"status\" : \"non\", \"to\" : \"1\", \"type\" : \"stop\"}'"
+
+rostopic pub /navistatus std_msgs/String "data: '{\"battery\" : \" 87\", \"error_log\" : \"none\", \"goallist\" : {\"tray1\" : \"non\", \"tray2\" : \"non\", \"tray3\" : \"non\" , \"tray4\" : \"non\" }, \"neartable\" : \"2\", \"next\" : \" non\", \"nodeid\" : \"22\", \"progress\" : \"0.000000\", \"ready2work\" : \"ready\", \"robotname\" : \"servinggo\", \"status\" : \"non\", \"to\" : \"1\", \"type\" : \"arrived\"}'"
+
+{command: 'jobsequence', js:[{task:'DELIVER', action:{location: 101, tray: 11}},{task:'DELIVER', location:102, tray:21}} ,{task:   'DELIVER', action:{location:103, tray:31}},{task:'HOME', action:{location: 0}},{task:'ERR', action:{waht: 0}}]};
+
+rostopic pub /manualCmd std_msgs/String "data: '{\"command\" : \"status\" }'"
+
+rostopic pub /manualCmd std_msgs/String "data: '{\"command\" : \"jobsequence\", \"js\" : [{ \"task\" : \"DEMODELIVER\" , \"action\" : {\"location\" : 1, \"tray\" : 1}},{ \"task\" : \"DEMODELIVER\" , \"action\" : {\"location\" : 1, \"tray\" : 2}}]}'"
+
+
+rostopic pub /manualCmd std_msgs/String "data: '{\"command\" : \"reqStart\" }'"
+
+rostopic pub /arm/cmd std_msgs/Float32MultiArray "layout:
+  dim: []
+  data_offset: 0
+data: [1.0, 0.35492104291915894, -0.40874433517456055, -0.21131545305252075]"

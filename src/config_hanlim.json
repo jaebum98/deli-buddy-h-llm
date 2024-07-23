@@ -1,0 +1,59 @@
+{
+    "robotName": "pandemic201",
+    "MapName": "Map1",
+    "server": "161.122.113.147",
+    "port": 443,
+    "port2": 7778,
+    "robotID" : "46",
+    "mapLoad" :[
+                {"1" : "load 1"},// 1 floor
+                {"2" : "load 2"},// 5 floor
+                {"3" : "load 3"},// 11 floor
+                {"4" : "load 4"} // 13 floor
+            ],
+    "evLocation" :[
+                {"10" : "1000"}, // in front of ev (1st floor map)
+                {"11" : "1001"}, // ev inside (1st floor map)
+
+                {"20" : "2000"}, // in front of ev (5th floor map)
+                {"21" : "2001"}, // ev inside (5th floor map)
+
+                {"30" : "3000"}, // in front of ev (11th floor map)
+                {"31" : "3001"}, // ev inside (11th floor map)    
+
+                {"40" : "4000"}, // in front of ev (13th floor map)
+                {"41" : "4001"} // ev inside (13th floor map)
+            ],
+    "evDistance" :[
+                {"1" : 8000},
+                {"2" : 8000},
+                {"3" : 8000}, 
+                {"4" : 8000}
+            ],
+    "locationCorresponence" : [
+                {"8100" : "Place 01"}, // home (1st floor)
+                {"1000" : "Place 02"}, // in front of EV
+                {"1001" : "Place 04"}, // EV inside
+
+                {"8201" : "Place 01"}, // 5th floor
+                {"2000" : "Place 02"}, // in front of EV
+                {"2001" : "Place 04"}, // EV inside
+
+                {"8301" : "Place 01"}, // 11th floor
+                {"3000" : "Place 02"}, // in front of EV
+                {"3001" : "Place 04"}, // EV inside
+
+                {"8401" : "Place 01"}, // 13th floor
+                {"4000" : "Place 02"}, // in front of EV
+                {"4001" : "Place 04"}  // EV inside
+            ],
+    "start" : "8100", // 평소엔 home과 동일
+    "home" : "8100", 
+
+    "Tray_Number" : {
+        "8201": [1,2,3],
+        "8301": [1,2,3],
+        "8401": [1,2,3]
+    }
+
+}

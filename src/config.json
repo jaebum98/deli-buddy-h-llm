@@ -1,0 +1,91 @@
+{
+    "robotName": "pandemic201",
+    "MapName": "Map1",
+    "server": "161.122.113.147",
+    "port": 443,
+    "port2": 7778,
+    "robotID" : "46",
+    "mapLoad" :[
+                {"1" : "load 1"},
+                {"2" : "load 2"},
+                {"3" : "load 3"},
+                {"4" : "load 4"} // 전시회 용
+            ],
+    "evLocation" :[
+                {"10" : "1000"}, // in front of ev (2nd floor map)
+                {"11" : "1001"}, // ev inside (2nd floor map)
+
+                {"20" : "2000"}, // in front of ev (2nd floor map)
+                {"21" : "2001"}, // ev inside (2nd floor map)
+                // {"22" : "2002"}, // where to unload
+
+                {"30" : "3000"}, // in front of ev (3rd floor map)
+                {"31" : "3001"} // ev inside (3rd floor map)    
+                // {"32" : "3002"}  // where to unload
+            ],
+    "evDistance" :[
+                {"1" : 3000},
+                {"2" : 3000},
+                {"3" : 3000}
+            ],
+    "locationCorresponence" : [
+                {"8111" : "Place 01"}, // 1rd floor
+                {"8109" : "Place 02"}, 
+                {"8103" : "Place 03"}, 
+                {"8101" : "Place 04"},
+                {"8100" : "Place 05"}, // home 
+                {"1000" : "Place 06"}, // in front of EV
+                {"1001" : "Place 07"}, // EV inside
+
+                {"8222" : "Place 01"}, // 2nd floor
+                {"8202" : "Place 02"}, 
+                {"8205" : "Place 03"}, 
+                {"8223" : "Place 04"}, 
+                {"2000" : "Place 05"}, // in front of EV
+                {"2001" : "Place 06"}, // EV inside
+                // {"2002" : "Place 07"}  // in front of EV (unload finish location)
+
+                {"8323" : "Place 01"}, // 3rd floor
+                {"8304" : "Place 02"}, 
+                {"8306" : "Place 03"}, 
+                {"8324" : "Place 04"}, 
+                {"3000" : "Place 06"}, // in front of EV
+                {"3001" : "Place 07"}, // EV inside
+                {"8300" : "Place 05"}, //home
+                // {"3002" : "Place 07"}, // in front of EV (unload finish location)
+
+                {"8410" : "Place 01"},
+                {"8411" : "Place 02"},
+                {"8400" : "Place 03"}
+
+                // {"3220" : "Place 05"}, // 2
+                // {"3100" : "Place 06"}, // 6
+                // {"3600" : "Place 07"}, // 7
+                // {"3231" : "Place 08"}, // 1
+                // {"3232" : "Place 09"}, 
+                // {"3210" : "Place 10"}, // 3
+                // {"3230" : "Place 11"}, //HOME // 9
+                // {"3000" : "Place 12"},  // EV  // 10
+                // {"3001" : "Place 13"}  // EV load location
+
+
+            ],
+    "start" : "8300", // 평소엔 home과 동일
+    "home" : "8300", // 전시회용 : 8400
+
+    "Tray_Number" : {
+        "8111": [1,2,3],
+        "8109": [1,2,3],
+        "8103": [1,2,3],
+        "8101": [1,2,3],
+        "8222": [1,2,3],
+        "8202": [1,2,3],
+        "8205": [1,2,3],
+        "8223": [1,2,3],
+        "8323": [1,2,3],
+        "8304": [1,2,3],
+        "8306": [1,2,3],
+        "8324": [1,2,3]
+    }
+
+}

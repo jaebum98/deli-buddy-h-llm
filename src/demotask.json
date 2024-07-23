@@ -1,0 +1,16 @@
+{
+    "js" : [
+        {
+            "task":"DEMODELIVER",
+            
+            "action" : {
+                "location": 8410,
+                "tray": 9
+            }
+        },
+
+        {
+            "task":"DEMOHOME"
+        }
+    ]
+}
