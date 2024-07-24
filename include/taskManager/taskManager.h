@@ -45,22 +45,22 @@ public:
     int connectToServer(std::string host, uint16_t port);
     int connectToServerev(std::string host, uint16_t port);
 
-    // static int addTask_WAIT         (Json::Value params, taskManager* pt);
-    static int addTask_DELIVER      (Json::Value params, taskManager* pt);
-    static int addTask_MOVE         (Json::Value params, taskManager* pt);
-    static int addTask_RESETARM     (Json::Value params, taskManager* pt);
-    static int addTask_HOME         (Json::Value params, taskManager* pt);
-    static int addTask_DEMOHOME     (Json::Value params, taskManager* pt);
-    static int addTask_CHARGE       (Json::Value params, taskManager* pt);
-    static int addTask_ESTOP        (Json::Value params, taskManager* pt);
-    static int addTask_DEMODELIVER  (Json::Value params, taskManager* pt);
-    static int addTask_SWITCHFLOOR  (Json::Value params, taskManager* pt);
+    // static int addSkill_WAIT         (Json::Value params, taskManager* pt);
+    static int addSkill_DELIVER      (Json::Value params, taskManager* pt);
+    static int addSkill_MOVE         (Json::Value params, taskManager* pt);
+    static int addSkill_RESETARM     (Json::Value params, taskManager* pt);
+    static int addSkill_HOME         (Json::Value params, taskManager* pt);
+    static int addSkill_DEMOHOME     (Json::Value params, taskManager* pt);
+    static int addSkill_CHARGE       (Json::Value params, taskManager* pt);
+    static int addSkill_ESTOP        (Json::Value params, taskManager* pt);
+    static int addSkill_DEMODELIVER  (Json::Value params, taskManager* pt);
+    static int addSkill_SWITCHFLOOR  (Json::Value params, taskManager* pt);
 
-    int addTask(Json::Value nStatus);
+    int addSkill(Json::Value nStatus);
     int addDeliveryTask(int trayID, int locationID);
     int listTask();
 
-    map<string,int(*)(Json::Value, taskManager*)> addTaskFunctions;
+    map<string,int(*)(Json::Value, taskManager*)> addSkillFunctions;
     vector <taskBase*> vectorTask;
     vector <subtaskBase*> vectorSubTask;
 

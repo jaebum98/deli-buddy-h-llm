@@ -14,18 +14,13 @@ taskManager::taskManager(ros::NodeHandle* nodehandle):nh_(*nodehandle)
 {
     cout << "taskManager::taskManager"  << endl;
 
-    // add task functions
-    // addTaskFunctions["WAIT"]   =&addTask_WAIT;
-    addTaskFunctions["DELIVER"]=&addTask_DELIVER; 
-    addTaskFunctions["MOVE"]=&addTask_MOVE; 
-    addTaskFunctions["RESETARM"]=&addTask_RESETARM; 
-    addTaskFunctions["DEMODELIVER"]=&addTask_DEMODELIVER;
-    addTaskFunctions["SWITCHFLOOR"]=&addTask_SWITCHFLOOR;
-
-    addTaskFunctions["HOME"]   =&addTask_HOME;
-    addTaskFunctions["DEMOHOME"]   =&addTask_DEMOHOME;
-    addTaskFunctions["CHARGE"] =&addTask_CHARGE;
-    addTaskFunctions["ESTOP"]  =&addTask_ESTOP;
+    // add skill functions
+    addSkillFunctions["MoveTo"]=&addSkill_MoveTo; 
+    addSkillFunctions["Detect"]=&addSkill_Detect; 
+    addSkillFunctions["Manipulate"]=&addSkill_Manipulate; 
+    addSkillFunctions["PrepareLoad"]=&addSkill_PrepareLoad;
+    addSkillFunctions["DecideLoad"]=&addSkill_DecideLoad;
+    addSkillFunctions["SwitchFloor"]=&addSkill_SwitchFloor;
 
     // comm related
     tcpSocket = new TCPSocket([](int errorCode, std::string errorMessage)
@@ -55,8 +50,6 @@ taskManager::taskManager(ros::NodeHandle* nodehandle):nh_(*nodehandle)
             // std::cerr << "Parsing failed with error: " << err << std::endl;
         }
         if      (rMessage["command"]=="jobsequence")            onMessageJobSequence(rMessage);
-        //else if (rMessage["command"]=="received")               cout << message << endl;
-        else if (rMessage["command"]=="reqStatus")              onMessageRequestStatus(tcpSocket);
         else if (rMessage["command"]=="reqStart")               onMessageRequestStart(tcpSocket);  
         
         else if (rMessage["command"]=="reqTaskClear")           onMessageRequestTaskClear(tcpSocket);
@@ -66,32 +59,18 @@ taskManager::taskManager(ros::NodeHandle* nodehandle):nh_(*nodehandle)
 
         else if (rMessage["command"]=="resPrepareLoad")         onMessageResponsePrepareLoad(tcpSocket);
         else if (rMessage["command"]=="resRePrepareLoad")       onMessageResponseRePrepareLoad(tcpSocket);
-        else if (rMessage["command"]=="resLoadRes")             onMessageResponseLoadManually(tcpSocket); 
         else if (rMessage["command"]=="resSwitchFloor")         onMessageResponseSwitchFloor(tcpSocket);
 
         else if (rMessage["command"]=="reqloadmap")             onMessageResponseLoadMap(rMessage);
         else if (rMessage["command"]=="reqnodeStatus")          onMessageRequestNodeStatus(rMessage); 
         else if (rMessage["command"]=="reqRebootProcess")       onMessageRequestReboot(rMessage); 
-        else if (rMessage["command"]=="manualNextTask")       onMessageManualNextTask(rMessage); 
+        else if (rMessage["command"]=="manualNextTask")         onMessageManualNextTask(rMessage); 
 
         else {
             cout << "unknown command" << message << endl;
         }
     };
 
-    // tcpSocketev->onMessageReceived = [&](string evmessage) {
-    //     // cout << "Message from the Server: " << message << endl;
-    //     // parse json message
-    //     Json::Value evrMessage;
-    //     Json::Reader evreader;
-    //     bool parsingSuccessful = evreader.parse(evmessage, evrMessage );
-    //     if ( !parsingSuccessful )
-    //     {
-    //         cout << "ev Error parsing the string" << endl;
-    //     }
-    //     if (evrMessage["command"]=="resRePrepareLoad")  onMessageResponseRePrepareLoad(tcpSocketev);
-    //     else cout << "unknown ev command" << evmessage << endl;
-    // };
     // On socket closed:
     tcpSocket->onSocketClosed = [this](int errorCode)
     {
@@ -104,11 +83,6 @@ taskManager::taskManager(ros::NodeHandle* nodehandle):nh_(*nodehandle)
         sleep(0.5);
         system("rosrun pandemic_task_manager_ros pandemic_task_manager_ros_node");
     };
-
-    // socket connect
-    // ros::ServiceClient status_client = nh_.serviceClient<std_srvs::Trigger>("status_check");
-    
-    // ros::Timer auto_recovery_timer = nh_.createTimer(ros::Duration(1.0), boost::bind(&taskManager::statusCallback, this, _1, status_client));
 
     // initialize ros network handlers
     initializeSubscribers();
@@ -141,15 +115,6 @@ taskManager::taskManager(ros::NodeHandle* nodehandle):nh_(*nodehandle)
     std_msgs::String rosParamMsg;
     rosParamMsg.data = jsonParamMsg;
     mapPublishers["cmdGUI"]->publish(rosParamMsg);
-
-
-    // std_msgs::Float32MultiArray array;
-    // array.data.clear();
-	// array.data.push_back(0);
-	// array.data.push_back(0);
-	// array.data.push_back(0);
-	// array.data.push_back(0);
-    // mapPublishers["arm_pub"]->publish(array);
 
     std_msgs::String speakermp3;
     speakermp3.data = "taskmanager_operate";
@@ -191,7 +156,6 @@ void taskManager::initializeSubscribers()
     arm_info_sub = nh_.subscribe("/arm_info", 1, &taskManager::armInfoCallback, this);
     // ev_load_status_sub = nh_.subscribe("/output_Mode", 10, &taskManager::evLoadStatusCallback, this);
     dock_check_sub = nh_.subscribe("/e_dock/check_result", 1 ,&taskManager::edockresultCallback, this);
-    keyboard_input_sub = nh_.subscribe("/keyboard_input", 1, &taskManager::keyboardCallback, this);
     camera_status_sub = nh_.subscribe("/service_vision/camera_status", 1, &taskManager::cameraStatusCallback, this);
     deliver_status_sub = nh_.subscribe("/deliver_check", 1 ,&taskManager::deliveryStatusCallback, this);
 }
@@ -200,85 +164,6 @@ void taskManager::initializeServiceClients(){
     cona_client = nh_.serviceClient<pandemic_task_manager_ros::taskmanager_srv>("/cona_service");
     nuc_client = nh_.serviceClient<pandemic_task_manager_ros::taskmanager_srv>("/nuc_service");
 }
-
-
-// void taskManager::Clientservice(){
-//     ros::ServiceClient status_client = nh_.serviceClient<std_srvs::Trigger>("status_check");
-//     ROS_INFO("calling service!");
-//     // ros::Timer auto_recovery_timer = nh_.createTimer(ros::Duration(5.0), [&](const ros::TimerEvent& event) {
-//     //     ROS_INFO("calling service!");
-//     //     statusCallback(event, status_client);
-        
-//     // });
-// }
-
-// void taskManager::statusCallback(const ros::TimerEvent& event, ros::ServiceClient& client) {
-
-//     ROS_INFO("calling service!");
-//     if (!client.waitForExistence(ros::Duration(5.0))) {
-//         cout << "상태 확인 서비스를 찾을 수 없습니다." << endl;
-//         // return 1;
-//     }
-//     ROS_INFO("calling service!");
-//     std_srvs::Trigger srv;
-//     if (client.call(srv)) {
-        
-//         if (srv.response.success) {
-//             cout << "노드가 정상 동작 중입니다. 상태 메시지: " << srv.response.message.c_str() << endl;
-//         } else {
-//             cout <<"노드에서 문제가 발생했습니다. 상태 메시지: " << srv.response.message.c_str() << endl;
-//         }
-//         ROS_INFO("service respond!");
-//     } else {
-//         ROS_ERROR("service not respond!");
-//     }
-// }
-
-// void taskManager::NucWheelClientservice(){
-//     ros::ServiceClient status_client = nh_.serviceClient<std_srvs::Trigger>("wheel_status_check");
-//     std::string nucwheelmessage;
-//     if (!status_client.waitForExistence(ros::Duration(5.0))) {
-//         cout << "상태 확인 서비스를 찾을 수 없습니다." << endl;
-//     }
-//     std_srvs::Trigger srv;
-//     if (status_client.call(srv)) {
-//         // statusCallback(srv.response);
-//         nucwheelmessage = srv.response.message;
-//         ROS_INFO("%s", nucwheelmessage.c_str());
-//     } else {
-//         nucwheelmessage = "NUC Wheel service not respond";
-//         ROS_ERROR("%s", nucwheelmessage.c_str());
-//     }
-//     currentStatus.setNodeStatus(nucwheelmessage);
-//     Json::Value sendbuffer;
-//     currentStatus.writeRobotNodeStatusdata(sendbuffer);
-
-//     Json::Value jsonData;
-//     jsonData["type"] = "NODESTATUS";
-//     jsonData["content"] = sendbuffer;
-//     Json::StreamWriterBuilder writer;
-//     std::string jsonstring = Json::writeString(writer, jsonData);
-
-//     tcpSocket->Send(jsonstring);
-// }
-
-// void taskManager::NucManiClientservice(){
-//     ros::ServiceClient status_client = nh_.serviceClient<std_srvs::Trigger>("/manipulate_status_check");
-//     std::string nucmanimessage;
-//     if (!status_client.waitForExistence(ros::Duration(5.0))) {
-//         cout << "상태 확인 서비스를 찾을 수 없습니다." << endl;
-//     }
-//     std_srvs::Trigger srv;
-//     if (status_client.call(srv)) {
-//         // statusCallback(srv.response);
-//         nucmanimessage = srv.response.message;
-//         ROS_INFO("%s", nucmanimessage.c_str());
-//     } else {
-//         nucmanimessage = "NUC service not respond";
-//         ROS_ERROR("%s", nucmanimessage.c_str());
-//     }
-//     currentStatus.setNodeStatus(nucmanimessage);
-// }
 
 void taskManager::NucClientservice(string nodename){
     std::string nucmessage;
@@ -344,77 +229,6 @@ void taskManager::ConaClientservice(std::string nodename){
     tcpSocket->SendJson(jsonstring);
 }
 
-// void taskManager::VisionClientservice(string nodename){
-//     ros::ServiceClient status_client = nh_.serviceClient<pandemic_task_manager_ros::taskmanager_srv>("/vision_status_check");
-//     std::string visionmessage;
-//     if (!status_client.waitForExistence(ros::Duration(2.0))) {
-//         cout << "상태 확인 서비스를 찾을 수 없습니다." << endl;
-//     }
-//     std_srvs::Trigger srv;
-//     if (status_client.call(srv)) {
-//         // statusCallback(srv.response);
-//         visionmessage = srv.response.message;
-//         ROS_INFO("%s", visionmessage.c_str());
-//     } else {
-//         visionmessage = "VISION service not respond";
-//         ROS_ERROR("%s", visionmessage.c_str());
-//     }
-//     currentStatus.setNodeStatus(visionmessage);
-//     Json::Value sendbuffer;
-//     currentStatus.writeRobotNodeStatusdata(sendbuffer);
-
-//     Json::Value jsonData;
-//     jsonData["type"] = "NODESTATUS";
-//     jsonData["content"] = sendbuffer;
-//     Json::StreamWriterBuilder writer;
-//     std::string jsonstring = Json::writeString(writer, jsonData);
-
-//     tcpSocket->Send(jsonstring);
-// }
-
-// void taskManager::RebootClientservice(){
-//     ros::ServiceClient status_client = nh_.serviceClient<pandemic_task_manager_ros::taskmanager_srv>("/reboot_process");
-//     std::string conamessage;
-//     if (!status_client.waitForExistence(ros::Duration(5.0))) {
-//         cout << "상태 확인 서비스를 찾을 수 없습니다." << endl;
-//     }
-//     pandemic_task_manager_ros::taskmanager_srv srv;
-//     srv.request.request = "checkError-Odom";
-//     if (status_client.call(srv)) {
-//         // statusCallback(srv.response);
-//         if(srv.response.response == "true"){
-//             conamessage = "CONA : No Odom";
-//         }
-//         else conamessage = "CONA normal Operation!";
-
-//         ROS_INFO("%s", conamessage.c_str());
-//     } else {
-//         conamessage = "CONA service not respond";
-//         ROS_ERROR("%s", conamessage.c_str());
-//     }
-//     currentStatus.setNodeStatus(conamessage);
-//     Json::Value sendbuffer;
-//     currentStatus.writeRobotNodeStatusdata(sendbuffer);
-    
-//     Json::Value jsonData;
-//     jsonData["type"] = "NODESTATUS";
-//     jsonData["content"] = sendbuffer;
-//     Json::StreamWriterBuilder writer;
-//     std::string jsonstring = Json::writeString(writer, jsonData);
-
-//     tcpSocket->Send(jsonstring);
-// }
-
-
-// void taskManager::statusCallback(const std_srvs::Trigger::Response& res) {
-//   if (res.success) {
-//     cout << "노드가 정상 동작 중입니다. 상태 메시지: " << res.message.c_str() << endl;
-//   } else {
-//     cout <<"노드에서 문제가 발생했습니다. 상태 메시지: " << res.message.c_str() << endl;
-//     // 필요한 복구 조치를 수행
-//   }
-// }
-
 void taskManager::initializePublishers()
 {
     cmdGUI = nh_.advertise<std_msgs::String>("cmdGUI", 10, true);
@@ -442,68 +256,6 @@ void taskManager::initializePublishers()
     mapPublishers["speaker_pub"] = &speaker_pub;
 }
 
-
-
-void taskManager::keyboardCallback(const std_msgs::String::ConstPtr& msg)
-{
-    string keydata = msg->data;
-    Json::Value tasksequence;
-    cout << "문자상태 : " << atoi(keydata.c_str()) << endl;
-    Json::Value homesequence;
-    homesequence["task"] = "DEMOHOME";
-    if (atoi(keydata.c_str()) == 0){
-        if (keydata == "d") { // sequence를 초기 정의해둔 demotask실행 명렁어
-            std::ifstream cfgfile("/home/vision/catkin_ws/src/pandemic_task_manager_ros/src/demotask.json");
-            cfgfile >> tasksequence;
-            onMessageJobSequence(tasksequence);
-        }
-        else if(keydata == "r") { //팔의 위치를 reset하기 위한 명령어
-            tasksequence["js"].append(homesequence);
-            onMessageJobSequence(tasksequence);
-        }
-        else if(keydata == "s") onMessageRequestStartOffline(); // task를 시작하기 위한 명령어
-        else if(keydata == "c") onMessageRequestTaskClearOffline();
-        else cout << "not exist command" << endl;
-    }
-    else { // 배달한 tray위치 지정해주고 task 정의하는 부분
-        std::vector<std::string> parts;
-        size_t startPos = 0;
-        
-        Json::Value deliversequence;
-        deliversequence["task"] = "DEMODELIVER";
-        deliversequence["action"]["location"] = 8410;
-        size_t dotPos = keydata.find('.'); // 문자열에서 첫번째 .(점) 위치찾음
-        while (dotPos != std::string::npos){ // 찾았을때 while문 진입
-            std::string part = keydata.substr(startPos, dotPos - startPos); // 찾은 .(점)앞의 문자열을 저장
-            parts.push_back(part);
-            startPos = dotPos + 1;
-            dotPos = keydata.find('.', startPos); //이전에 찾은 .(점)위치 뒤부터 다음 .(점)위치 찾음
-        }
-
-        if (startPos < keydata.length()){ // 맨 마지막 숫자로 이루어진 문자열 찾음
-            std::string part = keydata.substr(startPos);
-            parts.push_back(part);
-        }
-
-        for (const std::string& part : parts) { // 분리된 문자열을 for문으로 각각 부름.
-            // std::cout << "분리된 부분: " << part << std::endl;
-            int tray = atoi(part.c_str());
-            if (tray >= 1 && tray <= 8){
-                deliversequence["action"]["tray"] = tray;
-                tasksequence["js"].append(deliversequence);
-            }
-            else {
-                cout << "not exist tray number" << endl;
-                return;
-            }
-
-        }
-        tasksequence["js"].append(homesequence);
-        onMessageJobSequence(tasksequence);
-    }
-    
-};
-
 void taskManager::edockresultCallback(const std_msgs::Float64::ConstPtr& msg)
 {
     
@@ -513,35 +265,14 @@ void taskManager::edockresultCallback(const std_msgs::Float64::ConstPtr& msg)
     evobs = msg->data;
     Json::Value jsonData;
 
-    // cout << "obstacle : " << evobs << endl;
-
-
-    // cout << naviStatus << endl;
     if((naviStatus).find("stop-ems") != string::npos){
         jsonData["data"] = evobs;
         jsonData["status"] = naviStatus;
         if(callTaskCallback(jsonData) == -1){ 
             return;
         }
-        // cout<< getSubtaskName() << endl;
         currentStatus.setTaskInfo(getSubtaskName(), currentTask, vectorTask[currentTask]->stage);
-        // if (netstatus) // when network is alive,
-            // sendStatusToServer();
-        // sleep(0.2);
-
     }
-    // // cout << jsonData << endl;
-
-
-    // currentStatus.setTaskInfo(getSubtaskName(), currentTask, vectorTask[currentTask]->stage);
-            
-
-
-    // else if (naviStatus != "stop-ems" && ems==true){
-    //     ems = false;
-    // }
-
-
 }
 
 void taskManager::absolPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
@@ -558,9 +289,6 @@ void taskManager::absolPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& 
     double roll, pitch, yaw;
     m.getRPY(roll, pitch, yaw);
     currentStatus.setOrientation(yaw);
-
-    // just modify absolPose, do not send pose to server in this func
-
 }
 
 
@@ -707,22 +435,6 @@ void taskManager::armStatusCallback(const std_msgs::Int32::ConstPtr& msg)
 
 void taskManager::leftPoseCallback(const pandemic_task_manager_ros::PlaneEstimation::ConstPtr& msg)
 {
-//   geometry_msgs::PoseWithCovariance msgr;
-//   msgr.pose.position.x = msg->pose.pose.position.x;
-//   msgr.pose.position.y = msg->pose.pose.position.y;
-//   msgr.pose.position.z = msg->pose.pose.position.z;
-//   msgr.pose.orientation.w = msg->pose.pose.orientation.w;
-//   msgr.pose.orientation.x = msg->pose.pose.orientation.x;
-//   msgr.pose.orientation.y = msg->pose.pose.orientation.y;
-//   msgr.pose.orientation.z = msg->pose.pose.orientation.z;
-
-//   for(int i = 0; i < 36; i++)
-//   {
-//     msgr.covariance[i] = 1;
-//   }
-//   msgr_left = msgr;
-//   left_status = true;
-
     cout << "leftPoseCallback() callback" << endl;
 
     if(emergencyFlag == true){
@@ -809,20 +521,6 @@ void taskManager::rightPoseCallback(const pandemic_task_manager_ros::PlaneEstima
     }
 
    geometry_msgs::PoseWithCovariance msgr;
-//   msgr.pose.position.x = msg->pose.pose.position.x;
-//   msgr.pose.position.y = msg->pose.pose.position.y;
-//   msgr.pose.position.z = msg->pose.pose.position.z;
-//   msgr.pose.orientation.w = msg->pose.pose.orientation.w;
-//   msgr.pose.orientation.x = msg->pose.pose.orientation.x;
-//   msgr.pose.orientation.y = msg->pose.pose.orientation.y;
-//   msgr.pose.orientation.z = msg->pose.pose.orientation.z;
-
-//   for(int i = 0; i < 36; i++)
-//   {
-//     msgr.covariance[i] = 1;
-//   }
-//   msgr_right = msgr;
-//   right_status = true;
 
     
     Json::Value jsonData;
@@ -851,15 +549,11 @@ void taskManager::rightPoseCallback(const pandemic_task_manager_ros::PlaneEstima
     }
     currentStatus.setTaskInfo(getSubtaskName(), currentTask, vectorTask[currentTask]->stage);
 
-    // if (netstatus) // when network is alive,
-    //     sendStatusToServer();
+
 }
 
 void taskManager::armInfoCallback(const pandemic_task_manager_ros::robot_data::ConstPtr& msg)
 {
-
-    // cout << "armInfoCallback() callback" << endl;
-
     if(emergencyFlag == true){
         return;
     }
@@ -880,106 +574,6 @@ void taskManager::armInfoCallback(const pandemic_task_manager_ros::robot_data::C
     currentStatus.setArmInfo(msg);    
 }
 
-// void taskManager::evLoadStatusCallback(const std_msgs::String::ConstPtr& msg)
-// {
-
-//     // cout << "evLoadStatusCallback() callback" << endl;
-
-//     if(emergencyFlag == true){
-//         return;
-//     }
-
-
-
-
-//     Json::Value jsonData;
-//     jsonData["type"] = "ignore";
-
-//     string result = msg->data;
-//     cout << "evLoadStatusCallback msg : " << result << endl;
-
-//     if (result.compare("Wait_Mode") == 0) { // finished loading
-//         cout << "Finished loading on ev" << endl;  
-//         jsonData["type"] = "loadRobot";
-//         jsonData["status"] = "load";
-//         currentStatus.setTaskInfo(getSubtaskName(), currentTask, vectorTask[currentTask]->stage);
-//     }
-//     else if (result.compare("Station_Mode") == 0){ // finished unloading
-//         cout << "Finished Unloading from ev" << endl;  
-//         jsonData["type"] = "loadRobot";
-//         jsonData["status"] = "unload";
-//         currentStatus.setTaskInfo(getSubtaskName(), currentTask, vectorTask[currentTask]->stage);
-//     }   
-
-//     if (netstatus)
-//         sendStatusToServer();
-    
-//     sleep(1);
-    
-        
-    
-//     Json::StreamWriterBuilder writer;
-//     std::string jsonstring = Json::writeString(writer, jsonData);
-
-//     if(callTaskCallback(jsonData) == -1){ 
-//         return;
-//     }
-    
-
-//     // currentStatus.setdeliveryCheck(result);
-
-//     // Json::Value jsonData;
-//     // jsonData["type"] = "ignore";
-	
-// 	// if (result.compare("success") == 0) { // Deliver success  
-// 	//     cout << "Deliver success" << endl;        
-// 	//     jsonData["type"] = "deliver_check";
-// 	//     jsonData["status"] = printResult;
-// 	//     currentStatus.setTaskInfo(getSubtaskName(), currentTask, vectorTask[currentTask]->stage);
-//     //     if (netstatus)
-//     //         sendStatusToServer();
-// 	// }
-//     // else if (result.compare("fail") == 0){ // Deliver fail  
-//     //     cout << "Deliver fail" << endl;
-//     //     jsonData["type"] = "deliver_check";
-// 	//     jsonData["status"] = printResult;
-//     //     currentStatus.setTaskInfo(getSubtaskName(), currentTask, vectorTask[currentTask]->stage);
-//     //     if (netstatus)
-//     //         sendStatusToServer();
-//     // }
-//     // sleep(1);
-
-//     // currentStatus.setdeliveryCheck("None"); // modify deliver check status to "None"
-
-// 	// Json::StreamWriterBuilder writer;
-//     // std::string jsonstring = Json::writeString(writer, jsonData);
-
-//     // if(callTaskCallback(jsonData) == -1){ // task 모두 끝나거나 없는 경우 vectorTask에 접근하면 안되므로 그전에 return
-//     //     return;
-//     // } 
-//     // currentStatus.setTaskInfo(getSubtaskName(), currentTask, vectorTask[currentTask]->stage);
-//     // if (netstatus) // when network is alive,
-//     //     sendStatusToServer();   
-
-
-
-
-    
-//     // if output mode status is wait_mode , it means loading robot on ev is completed. go to next step
-
-//     // if output mode status is statin_mode , it means unloading robot on ev is completed. go to next step
-
-
-// }
-
-
-
-
-void taskManager::cmdMappingNavi(const std_msgs::String::ConstPtr& msg)
-{
-
-}
-
 string taskManager::getSubtaskName()
 {
     if (vectorTask.size()==0) return "";
@@ -996,8 +590,6 @@ int taskManager::clearTasks()
     Json::Value noneTask;
     currentStatus.setWholeSequence(noneTask);
 
-    // add initialize part of robotStatus, if it needed later
-    // cout << "vectorTask.size() : " <<  vectorTask.size() << endl;
     currentTask = 0;   
 
     emergencyFlag = false;
@@ -1032,7 +624,6 @@ int taskManager::callTaskCallback(Json::Value s)
         if (netstatus) // when network is alive,
         {
             sendTaskSeqToServer();
-            // sendStatusToServer();   
         }
                      
         return -1;
@@ -1043,8 +634,6 @@ int taskManager::callTaskCallback(Json::Value s)
         vectorTask[currentTask]->invokeTask();
     }    
 
-    // cout << "currentTask = " << vectorTask[currentTask]->getTaskName() << ", currentSubTask = " << vectorTask[currentTask]->subtask[vectorTask[currentTask]->stage]->getSubtaskName() << endl;
-    // cout << "currentTaskID = " << currentTask << endl;
 }
 
 void taskManager::manualCommandCallback(const std_msgs::String::ConstPtr& msg)
@@ -1064,9 +653,6 @@ void taskManager::manualCommandCallback(const std_msgs::String::ConstPtr& msg)
     } else if (cmd == "reqStart") {
         cout << "taskManager::manualCommandCallback(const std_msgs::String::ConstPtr& msg) :: reqStart" << endl;
         onMessageRequestStart(tcpSocket);;
-    } else if (cmd=="status") {
-        cout << "taskManager::manualCommandCallback(const std_msgs::String::ConstPtr& msg) :: status" << endl;
-        onMessageRequestStatus(tcpSocket);
     } else {
         cout << "do not understand the manual command" << endl;
     }
@@ -1125,7 +711,6 @@ void taskManager::naviStatusCallback(const std_msgs::String::ConstPtr& msg)
     }
     else obscheck = 0;
 
-    // cout << naviState << endl;
     // when arrived 
     if((naviState).find("arrived") != string::npos){   // when arrived
         sleep(2);
@@ -1136,25 +721,8 @@ void taskManager::naviStatusCallback(const std_msgs::String::ConstPtr& msg)
         }
         currentStatus.setTaskInfo(getSubtaskName(), currentTask, vectorTask[currentTask]->stage);
 
-        // if (netstatus) // when network is alive,                
-        //     sendStatusToServer();
     }  
-    // when arrived 
-    // else if((naviStatus).find("stop-ems") != string::npos){   // when arrived
-    //     // sleep(1);
-    //     s["data"] = evobs;
-    //     if(callTaskCallback(s) == -1){ // call next subtask [ex.detect]
-    //         return;
-    //     }
-    //     currentStatus.setTaskInfo(getSubtaskName(), currentTask, vectorTask[currentTask]->stage);
 
-    //     // if (netstatus) // when network is alive,                
-    //     //     sendStatusToServer();
-    // }  
-    else {
-        // if (netstatus) // when network is alive,
-        //     sendStatusToServer();  
-    }
 }
 
 void taskManager::sendStatusToServerCallback(const ros::TimerEvent&)
@@ -1223,56 +791,32 @@ int taskManager::onMessageJobSequence(Json::Value &rMessage)
     std::string sourceFloor, targetFloor;
     std::string sourceFloor_inFrontEV, targetFloor_unload;
     std::string sourceFloor_evInside, targetFloor_evInside;
-
+    Json::Value::Members keys = jsonData.getMemberNames();
     // Task 추가
     for (int ii=0; ii<rMessage["js"].size(); ii++) {
-    //    location.push_back(rMessage["js"][ii]["location"].asInt());
-    //    task.push_back(rMessage["js"][ii]["tray"].asInt());
-    //    currentStatus.addDeliveryTask(rMessage["js"][ii]["tray"].asInt(), rMessage["js"][ii]["location"].asInt());
-    
-    //    addTask(rMessage["js"][ii]
         infojs = rMessage["js"][ii];    
-
-        if(infojs["task"].asString().compare("DELIVER") == 0){ // DELIVER : Json msg의 location ID가 중요한 경우
-            locFromjs = to_string(rMessage["js"][ii]["action"]["location"].asInt());
-            // cout << locationCorres.at(locFromjs) << endl;
-
-            // 그리고 찾은 value값을 원래 rMessage의 action에 추가하기 // ex. locationStr : Place 01
-            infojs["action"]["locationStr"] = locationCorres.at(locFromjs);
+        switch (infojs["skill"].asString()){
+            case "MoveTo":
+                locFromjs = to_string(rMessage["js"][ii]["location"]);
+                // 찾은 value값을 원래 rMessage의 skill에 추가하기 // ex. locationStr : Place 01
+                infojs["locationStr"] = locationCorres.at(locFromjs);
+                break;
+            case "PrepareLoad":
+                infojs["sourcefloor"]  = to_string(rMessage["js"]["floor"].asInt()); 
+                break;
+            case "DecideLoad":
+                break;
+            case "SwitchFloor":
+                targetFloor  = to_string(rMessage["js"]["floor"].asInt()); 
+                infojs["switchMap"] = mapNumCor.at(targetFloor);
+                break;
+            case "Detect":
+                break;
+            case "Manipulate":
+                infojs["tray"]  = to_string(rMessage["js"][ii]["tray"].asInt()); 
+                break;
         }
-        else if(infojs["task"].asString().compare("HOME") == 0){ // HOME : location ID와 place를 config.json의 데이터 가져와서 지정                    
-            infojs["action"]["location"] = stoi(home); // ex. 104
-            infojs["action"]["locationStr"] = locationCorres.at(home); // ex. Place 05
-            infojs["action"]["tray"] = -1;
-        }
-        else if(infojs["task"].asString().compare("SWITCHFLOOR") == 0) { // SWITCHFLOOR인 경우 config에 등록된 place 가져오도록 하기                
-            sourceFloor = to_string(rMessage["js"][ii]["action"]["sourceFloor"].asInt()); // ex. 3
-            targetFloor = to_string(rMessage["js"][ii]["action"]["targetFloor"].asInt());
-
-            sourceFloor_inFrontEV = sourceFloor + "0";
-            sourceFloor_evInside = sourceFloor + "1";            
-            // targetFloor_unload = targetFloor + "2";
-            // targetFloor_evInside = targetFloor + "1";
-            
-            // move in front of ev of source floor
-            infojs["action"]["location"] = stoi(evLocation.at(sourceFloor_inFrontEV)); // 3000
-            infojs["action"]["locationStr"] = locationCorres.at(evLocation.at(sourceFloor_inFrontEV)); // ex. place 12
-            infojs["action"]["tray"] = -1;
-
-            // distance to load node
-            infojs["action"]["distance"] = evDistance.at(sourceFloor); // mm단위 거리
-
-            // load (source floor)
-            infojs["action"]["evInsideStr_load"] =  locationCorres.at(evLocation.at(sourceFloor_evInside));
-
-            // map of unload floor
-            infojs["action"]["switchMap"] = mapNumCor.at(targetFloor);
-            infojs["action"]["switchFloor"] = targetFloor;
-            // infojs["action"]["evInsideStr_unload"] =  locationCorres.at(evLocation.at(targetFloor_evInside));
-            // infojs["action"]["evFrontStr_unload"] =  locationCorres.at(evLocation.at(targetFloor_unload));        
-        }   
-
-        if(addTask(infojs) == 1){
+        if(addSkill(infojs) == 1){
             cout << "Duplciated tray requested. Cleared Tasks" << endl;
             std_msgs::String speakermp3;
             speakermp3.data = "tasknotAssigned";
@@ -1280,20 +824,12 @@ int taskManager::onMessageJobSequence(Json::Value &rMessage)
             clearTasks();       
 
             currentStatus.setTaskInfo("", currentTask, -1);
-            currentStatus.setNotice("Duplicated Tray : Already used");  
-            // if (netstatus) // when network is alive,
-            //     sendStatusToServer();                
+            currentStatus.setNotice("Duplicated Tray : Already used");         
             
             return 0;
         }
     }
-    // for (int ii=0; ii<location.size(); ii++) {
-    //     cout << "location " << location[ii] << ", tray = " << task[ii] << endl;
-    // }
-
     cout << endl << endl;
-    // cout << "Current list of subtask" << endl;
-    // listTask();
 
     Json::Value jsonWholeTask;
     Json::Value jsonTask;
@@ -1338,38 +874,6 @@ int taskManager::onMessageJobSequence(Json::Value &rMessage)
     return 0;
 }
 
-int taskManager::onMessageRequestStatus(TCPSocket* tcpSocket) // send already assigned job sequence : there's no data for wholesequence var in index.js if new control web client enter or refreshed page during task.
-{
-    // cout << endl<< "statusRequest received.. sending status" << endl;
-    
-    // {
-    //     Json::Value jsonData;
-    //     jsonData["type"] = "STATUS";
-    //     Json::Value robotStatus;
-    //     currentStatus.writeRobotStatus(robotStatus);
- 
-    //     jsonData["content"] = robotStatus;
-
-    //     Json::StreamWriterBuilder writer;
-    //     std::string jsonstring = Json::writeString(writer, jsonData);
-    //     cout << "From ROS" << endl;
-    //     cout << jsonstring << endl;
-
-    //     // std::cout << "jsonstring.size() = " << jsonstring.size() << std::endl;
-
-    //     // Send an initial buffer
-    //     if (netstatus) 
-    //        tcpSocket->Send(jsonstring);
-    // }
-
-    if(vectorTask.size() != 0){
-        cout << endl<< "statusRequest received.. sending status" << endl;
-        sendTaskSeqToServer();
-    }
-    
-
-    return 0;
-}
 int taskManager::onMessageRequestStart(TCPSocket* tcpSocket)
 {   
 
@@ -1395,25 +899,6 @@ int taskManager::onMessageRequestStart(TCPSocket* tcpSocket)
     return 0;
 }
 
-int taskManager::onMessageRequestStartOffline()
-{   
-
-    cout << "startRequest received.. " << endl;
-    if (vectorTask.size()==0) {
-        cout << "   no job assigned.. waiting.." << endl;
-        return -1;
-    }
-    cout << "  currentTask.. " << currentTask<< endl;
-    vectorTask[currentTask]->invokeTask();    
-    cout << "currentTask = " << vectorTask[currentTask]->getTaskName() << ", currentSubTask = " << getSubtaskName() << endl;
-    cout << "currentTaskID = " << currentTask << endl;
- 
-    currentStatus.setTaskInfo(getSubtaskName(), currentTask, vectorTask[currentTask]->stage);
-    // currentStatus.setNotice("Task Start");
- 
-    return 0;
-}
-
 int taskManager::onMessageRequestTaskClear(TCPSocket* tcpSocket)
 {
     cout << "Request for clearing all tasks received.. " << endl;
@@ -1427,20 +912,6 @@ int taskManager::onMessageRequestTaskClear(TCPSocket* tcpSocket)
             sendTaskSeqToServer();
             // sendStatusToServer();   
          
-    // }
-
-    return 0;
-}
-
-int taskManager::onMessageRequestTaskClearOffline()
-{
-    cout << "Request for clearing all tasks received.. " << endl;
-    // if(vectorTask.size() > 0){
-        clearTasks();
-        initializeLoadmap(); //
-        currentStatus.setTaskInfo(getSubtaskName(), currentTask, -1); 
-        currentStatus.setNotice("Task not assigned");
-        currentStatus.setHoldStatus("off");
     // }
 
     return 0;
@@ -1524,36 +995,6 @@ int taskManager::onMessageResponseRePrepareLoad(TCPSocket* tcpSocket)
 }
 
 
-int taskManager::onMessageResponseLoadManually(TCPSocket* tcpSocket)
-{
-
-    Json::Value jsonData;
-    jsonData["type"] = "loadManually";
-
-    Json::StreamWriterBuilder writer;
-    std::string jsonstring = Json::writeString(writer, jsonData);
-
-    // if "load" is 'y': go next task
-    // if "load" is 'n : sleep for 20 sec and go previous task 
-
-    // 여기서 if문 y or n 에 따른 명령문 만들어야 됨
-
-
-
-
-
-
-
-    if(callTaskCallback(jsonData) == -1){
-        return 0;
-    }
-
-    currentStatus.setTaskInfo(getSubtaskName(), currentTask, vectorTask[currentTask]->stage);
-
-    // if (netstatus) // when network is alive,
-    //     sendStatusToServer();
-}
-
 int taskManager::onMessageResponseSwitchFloor(TCPSocket* tcpSocket)
 {
     currentStatus.setfloorID(stoi(((subtask_SWITCH*)(vectorTask[currentTask]->subtask[vectorTask[currentTask]->stage]))->targetFloor));
@@ -1569,9 +1010,6 @@ int taskManager::onMessageResponseSwitchFloor(TCPSocket* tcpSocket)
     }
 
     currentStatus.setTaskInfo(getSubtaskName(), currentTask, vectorTask[currentTask]->stage);
-
-    // if (netstatus) // when network is alive,
-    //     sendStatusToServer();
 }
 
 
@@ -1589,18 +1027,6 @@ int taskManager::onMessageRequestStopWait(Json::Value &rMessage)
         cout << "   no job assigned.." << endl;
         return -1;
     }
-     // 현재 subtask moveto아니면 리턴 (subtask에서 보내주는 방식)
-    // else if(getSubtaskName().compare("MOVETO") == 0){ 
-    //     jsonData["type"] = rMessage["sg"].asString();     // stop, go가 들어가있는 key
-    //     jsonstring = Json::writeString(writer, jsonData);       
-    // }
-    // else{
-    //     cout << "   Current subtask is not WAIT.." << endl;
-    //     return -1;
-    // }
-    // callTaskCallback(jsonData);
-
-
     else if(getSubtaskName().compare("MOVETO") == 0 || getSubtaskName().compare("MOVETOEV") == 0){ 
         std_msgs::String rosGoMsg;
         rosGoMsg.data = rMessage["sg"].asString();     // stop, go가 들어가있는 key
@@ -1661,16 +1087,6 @@ int taskManager::onMessageRequestNodeStatus(Json::Value &rMessage)
         std_msgs::Bool msg;
         msg.data = false;   
         mapPublishers["pub_left"]->publish(msg);
-        // while(1){
-        //     // cout << leftcamCheck << endl;
-        //     if (leftcamCheck == false) break;
-        // }
-        // cout << "!23" << endl;
-        
-        // while(1){
-        //     // cout << rightcamCheck << endl;
-        //     if (rightcamCheck == false) break;
-        // }
     }
     else {
         nodestatus = "Node name is incorrect";
@@ -1760,9 +1176,7 @@ int taskManager::loadConfig(string filename) {
   serverPortev = root["port2"].asUInt();
   std::string robotID = root["robotID"].asString();
   Json::Value mapCor = root["mapLoad"];
-  Json::Value evLoc = root["evLocation"];
   Json::Value locCor = root["locationCorresponence"];
-  Json::Value evDt = root["evDistance"];
   // place가 갈수있는 tray 정보
   Json::Value tray = root["Tray_Number"];
   
@@ -1782,8 +1196,6 @@ int taskManager::loadConfig(string filename) {
   setRobotName(name);
   setRobotID(robotID);
   setLoadMap(mapCor);
-  setEvLoc(evLoc);
-  setEvDt(evDt);
   setLocationCorres(locCor);
   setHomeLocation(homeLoc);
   setStartLocation(startLoc);
@@ -1812,33 +1224,6 @@ int taskManager::setLoadMap(Json::Value js)
 
         cout << "Set Floor Num - Map Number correspondence : " << floorNum << " <--> " << mapNum << endl;
         mapNumCor.insert({ floorNum, mapNum });        
-    }
-}
-
-int taskManager::setEvLoc(Json::Value js)
-{
-    std::string floorNum, locPlace; 
-
-    for(int i=0; i<js.size(); i++){
-        floorNum = js[i].getMemberNames()[0];
-        locPlace = js[i][floorNum].asString();
-
-        cout << "Set EV place correspondence : " << floorNum << " <--> " << locPlace << endl;
-        evLocation.insert({ floorNum, locPlace });        
-    }
-}
-
-int taskManager::setEvDt(Json::Value js)
-{
-    std::string floorNum;
-    float Distance;
-
-    for(int i=0; i<js.size(); i++){
-        floorNum = js[i].getMemberNames()[0];
-        Distance = js[i][floorNum].asFloat();
-
-        cout << "Set EV place Distance : " << floorNum << " <--> " << Distance << endl;
-        evDistance.insert({ floorNum, Distance });        
     }
 }
 
@@ -1970,88 +1355,52 @@ int taskManager::connectToServer(std::string host, uint16_t port)
     return ret;
 }
 
-
-//// task related
-
-int taskManager::addTask(Json::Value nTask)
+int taskManager::addSkill(Json::Value nSkill)
 {
-    string task = nTask["task"].asString();
-    auto iter = addTaskFunctions.find(task);
-    if (iter == addTaskFunctions.end())
+    string skill = nSkill["skill"].asString();
+    auto iter = addSkillFunctions.find(skill);
+    if (iter == addSkillFunctions.end())
     {
         // not found
-        cout << "addTask something wrong, Task " << task << " undefined " << endl;
+        cout << "addSkill something wrong, skill " << skill << " undefined " << endl;
     }
     else
         // modified : 중복 tray 반환값 == 1
-        // addTaskFunctions[task](nTask["action"], this);
-        if(addTaskFunctions[task](nTask["action"], this) == 1){ 
-            return 1;   
-        }    
-}
-
-// int taskManager::addTask_WAIT(Json::Value params, taskManager* pt){
-
-//     task_WAIT* task = new task_WAIT;
-//     task->setTask(params,&pt->nh_,pt->mapPublishers);//>cmdGUI, &pt->pub_left, &pt->pub_right, &pt->conaGo_pub);
-
-//     pt->vectorTask.push_back(task);
-
-//     cout << "taskManager::addTask_WAIT(Json::Value params, taskManager* pt) not yet implemented" << endl;
-// }
-
-int taskManager::addTask_DEMODELIVER(Json::Value params, taskManager* pt){
-    int trayID = params["tray"].asInt();
-    int locationID = params["location"].asInt();
-    cout << params << endl;
-    cout << "trayID = " << trayID << endl;
-    //pt->addDeliveryTask(trayID, locationID);
-    {
-        auto ret = pt->taskListDelivery.insert({ trayID, locationID });
-
-        if (!ret.second) { //already trayID is used
-            cout << "error in addTask, trayID " << trayID << " is already used in the task list." << endl;
+        if(addSkillFunctions[skill](nSkill, this) == 1){
             return 1;
         }
-        else {
-            task_DEMODELIVER* task = new task_DEMODELIVER;
-            task->setTask(params,&pt->nh_,pt->mapPublishers);//, &pt->pub_left, &pt->pub_right, &pt->conaGo_pub);
-
-            pt->vectorTask.push_back(task);
-        }
-    }
-
-    // cout << "taskManager::addTask_DEMODELIVER(Json::Value params, taskManager* pt) for testing" << endl;
-
 }
 
-int taskManager::addTask_DELIVER(Json::Value params, taskManager* pt){
-    int trayID = params["tray"].asInt();
+int taskManager::addSkill_MoveTo(Json::Value params, taskManager* pt){
     int locationID = params["location"].asInt();
     std::string locationSTR = params["locationStr"].asString();
 
-    cout << "trayID = " << trayID  << ", location = " << locationID << ", Place = "  << locationSTR << endl;
-    //pt->addDeliveryTask(trayID, locationID);
+    cout << "location = " << locationID << ", Place = "  << locationSTR << endl;
     {
         auto ret = pt->taskListDelivery.insert({ trayID, locationID });
 
         if (!ret.second) { //already trayID is used
-            cout << "error in addTask, trayID " << trayID << " is already used in the task list." << endl;
+            cout << "error in addSkill, trayID " << trayID << " is already used in the task list." << endl;
             return 1;
         }
         else {
-            task_DELIVER* task = new task_DELIVER;
-            task->setTask(params,&pt->nh_,pt->mapPublishers);//, &pt->pub_left, &pt->pub_right, &pt->conaGo_pub);
-
-
-            pt->vectorTask.push_back(task);
+            skill_MoveTo* task = new skill_MoveTo;
+            skill->setSkill(params,&pt->nh_,pt->mapPublishers);//, &pt->pub_left, &pt->pub_right, &pt->conaGo_pub);
+            pt->vectorSkill.push_back(skill);
         }
     }
-
-    // cout << "taskManager::addTask_DELIVER(Json::Value params, taskManager* pt) for testing" << endl;
 }
 
-int taskManager::addTask_MOVE(Json::Value params, taskManager* pt){
+
+
+
+
+
+
+
+
+
+int taskManager::addSkill_Detect(Json::Value params, taskManager* pt){
     int trayID = params["tray"].asInt();
     int locationID = params["location"].asInt();
     std::string locationSTR = params["locationStr"].asString();
@@ -2062,7 +1411,7 @@ int taskManager::addTask_MOVE(Json::Value params, taskManager* pt){
         auto ret = pt->taskListDelivery.insert({ trayID, locationID });
 
         if (!ret.second) { //already trayID is used
-            cout << "error in addTask, trayID " << trayID << " is already used in the task list." << endl;
+            cout << "error in addSkill, trayID " << trayID << " is already used in the task list." << endl;
             return 1;
         }
         else {
@@ -2074,10 +1423,9 @@ int taskManager::addTask_MOVE(Json::Value params, taskManager* pt){
         }
     }
 
-    // cout << "taskManager::addTask_DELIVER(Json::Value params, taskManager* pt) for testing" << endl;
 }
 
-int taskManager::addTask_RESETARM(Json::Value params, taskManager* pt){
+int taskManager::addSkill_RESETARM(Json::Value params, taskManager* pt){
     int trayID = params["tray"].asInt();
     int locationID = params["location"].asInt();
     std::string locationSTR = params["locationStr"].asString();
@@ -2088,7 +1436,7 @@ int taskManager::addTask_RESETARM(Json::Value params, taskManager* pt){
         auto ret = pt->taskListDelivery.insert({ trayID, locationID });
 
         if (!ret.second) { //already trayID is used
-            cout << "error in addTask, trayID " << trayID << " is already used in the task list." << endl;
+            cout << "error in addSkill, trayID " << trayID << " is already used in the task list." << endl;
             return 1;
         }
         else {
@@ -2100,11 +1448,10 @@ int taskManager::addTask_RESETARM(Json::Value params, taskManager* pt){
         }
     }
 
-    // cout << "taskManager::addTask_DELIVER(Json::Value params, taskManager* pt) for testing" << endl;
 }
 
 
-int taskManager::addTask_SWITCHFLOOR(Json::Value params, taskManager* pt){
+int taskManager::addSkill_SWITCHFLOOR(Json::Value params, taskManager* pt){
     
     cout << "Source Floor = " << params["sourceFloor"].asInt() << ", Target Floor = "  << params["targetFloor"].asInt() 
         << " Switch Map = " << params["switchMap"] << endl;
@@ -2114,11 +1461,9 @@ int taskManager::addTask_SWITCHFLOOR(Json::Value params, taskManager* pt){
 
     pt->vectorTask.push_back(task);
 
-    // cout << "taskManager::addTask_DELIVER(Json::Value params, taskManager* pt) for testing" << endl;
-
 }
 
-int taskManager::addTask_HOME(Json::Value params, taskManager* pt){
+int taskManager::addSkill_HOME(Json::Value params, taskManager* pt){
 
     int locationID = params["location"].asInt();
     std::string locationSTR = params["locationStr"].asString();
@@ -2131,70 +1476,4 @@ int taskManager::addTask_HOME(Json::Value params, taskManager* pt){
     task->setTask(params,&pt->nh_,pt->mapPublishers);//>cmdGUI, &pt->pub_left, &pt->pub_right, &pt->conaGo_pub);
 
     pt->vectorTask.push_back(task);
-
-    // cout << "taskManager::addSubTask_HOME(Json::Value params) not yet implemented" << endl;
-
-}
-
-int taskManager::addTask_DEMOHOME(Json::Value params, taskManager* pt){
-
-    int locationID = params["location"].asInt();
-    std::string locationSTR = params["locationStr"].asString();
-
-    cout << "location = " << locationID << ", Place = "  << locationSTR << endl;
-
-    task_DEMOHOME* task = new task_DEMOHOME;
-   // task->setTask(params,&pt->nh_,&cmdGUI, &pub_left, &pub_right, &conaGo_pub);
-   // task->setTask(params,&pt->nh_,&pt->cmdGUI, &pt->pub_left, &pt->pub_right, &pt->conaGo_pub);
-    task->setTask(params,&pt->nh_,pt->mapPublishers);//>cmdGUI, &pt->pub_left, &pt->pub_right, &pt->conaGo_pub);
-
-    pt->vectorTask.push_back(task);
-
-    // cout << "taskManager::addSubTask_HOME(Json::Value params) not yet implemented" << endl;
-
-}
-
-
-int taskManager::addTask_CHARGE(Json::Value params, taskManager* pt){
-    task_CHARGE* task = new task_CHARGE;
-    //task->setTask(params,&pt->nh_,&cmdGUI, &pub_left, &pub_right, &conaGo_pub);
-    //task->setTask(params,&pt->nh_,&pt->cmdGUI, &pt->pub_left, &pt->pub_right, &pt->conaGo_pub);
-    task->setTask(params,&pt->nh_,pt->mapPublishers);//>cmdGUI, &pt->pub_left, &pt->pub_right, &pt->conaGo_pub);
-
-    pt->vectorTask.push_back(task);
-    cout << "taskManager::addSubTask_CHARGE(Json::Value params) not yet implemented" << endl;
-
-}
-
-int taskManager::addTask_ESTOP(Json::Value params, taskManager* pt){
-    task_ESTOP* task = new task_ESTOP;
-    //task->setTask(params,&pt->nh_,&cmdGUI, &pub_left, &pub_right, &conaGo_pub);
-    //task->setTask(params,&pt->nh_,&pt->cmdGUI, &pt->pub_left, &pt->pub_right, &pt->conaGo_pub);
-    task->setTask(params,&pt->nh_,pt->mapPublishers);//>cmdGUI, &pt->pub_left, &pt->pub_right, &pt->conaGo_pub);
-
-    pt->vectorTask.push_back(task);
-    cout << "taskManager::addSubTask_ESTOP(Json::Value params) not yet implemented" << endl;
-
-}
-
-
-int taskManager::addDeliveryTask(int trayID, int locationID) // X
-{
-    auto ret = taskListDelivery.insert({ trayID, locationID });
-
-    if (!ret.second) { //already trayID is used
-        cout << "error in addTask, trayID " << trayID << " is already used in the task list." << endl;
-        return 1;
-    }
-    else return 0;
-}
-
-int taskManager::listTask()
-{
-    cout << "size of current Task = " << taskListDelivery.size() << endl;
-    std::map<int,int>::iterator it;
-    for(it=taskListDelivery.begin(); it!=taskListDelivery.end(); ++it) {
-        printf("trayID : %d", it->first);
-        printf("  locationID : %d \n", it->second);
-    }
 }

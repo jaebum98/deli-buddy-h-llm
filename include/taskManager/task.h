@@ -361,22 +361,6 @@ public:
     std::string evInsideStr_load;
 };
 
-
-// class subtask_RESET_ARM : public subtaskBase {
-
-// public:
-//     subtask_RESET_ARM() {};
-//     ~subtask_RESET_ARM() {};
-
-//     virtual int setSubtask(Json::Value js, map<string,ros::Publisher*> mPubs);
-//     virtual int invokeSubtask();
-//     virtual int callback_subtask(Json::Value js);
-//     virtual string getSubtaskName() {return "RESET_ARM";}
-
-//     virtual void listSubtask() {cout << "\t\t RESET_ARM  "<< endl;}
-
-// };
-
 class subtask_PREPARE_LOAD : public subtaskBase {
 
 public:
@@ -461,25 +445,3 @@ public:
     TCPSocket* tcpSocket;
 
 };
-
-
-// class subtask_DELIVER_CHECK : public subtaskBase {
-
-// public:
-//     subtask_DELIVER_CHECK() {};
-//     ~subtask_DELIVER_CHECK() {};
-
-//     virtual int setSubtask(Json::Value js, map<string,ros::Publisher*> mPubs);
-//     virtual int invokeSubtask();
-//     virtual int callback_subtask(Json::Value js);
-//     virtual string getSubtaskName() {return "DELIVER_CHECK";}
-
-//     virtual void listSubtask() {cout << "\t\t DELIVER_CHECK  " << endl;}
-
-// };
-
-
-
-// Hold function
-// int holdSubtask(Json::Value js);
-
