@@ -17,7 +17,8 @@ taskManager::taskManager(ros::NodeHandle* nodehandle):nh_(*nodehandle)
     // add skill functions
     addSkillFunctions["MoveTo"]=&addSkill_MoveTo; 
     addSkillFunctions["Detect"]=&addSkill_Detect; 
-    addSkillFunctions["Manipulate"]=&addSkill_Manipulate; 
+    addSkillFunctions["Manipulate"]=&addSkill_Manipulate;
+    addSkillFunctions["SetEvEms"]=&addSkill_SetEvEms;
     addSkillFunctions["PrepareLoad"]=&addSkill_PrepareLoad;
     addSkillFunctions["DecideLoad"]=&addSkill_DecideLoad;
     addSkillFunctions["SwitchFloor"]=&addSkill_SwitchFloor;
@@ -64,7 +65,7 @@ taskManager::taskManager(ros::NodeHandle* nodehandle):nh_(*nodehandle)
         else if (rMessage["command"]=="reqloadmap")             onMessageResponseLoadMap(rMessage);
         else if (rMessage["command"]=="reqnodeStatus")          onMessageRequestNodeStatus(rMessage); 
         else if (rMessage["command"]=="reqRebootProcess")       onMessageRequestReboot(rMessage); 
-        else if (rMessage["command"]=="manualNextTask")         onMessageManualNextTask(rMessage); 
+        else if (rMessage["command"]=="manualNextSkill")        onMessageManualNextSkill(rMessage); 
 
         else {
             cout << "unknown command" << message << endl;
@@ -268,10 +269,10 @@ void taskManager::edockresultCallback(const std_msgs::Float64::ConstPtr& msg)
     if((naviStatus).find("stop-ems") != string::npos){
         jsonData["data"] = evobs;
         jsonData["status"] = naviStatus;
-        if(callTaskCallback(jsonData) == -1){ 
+        if(callSkillCallback(jsonData) == -1){ 
             return;
         }
-        currentStatus.setTaskInfo(getSubtaskName(), currentTask, vectorTask[currentTask]->stage);
+        currentStatus.setSkillInfo(vectorSkill[currentSkill]->getSkillName(), currentSkill);
     }
 }
 
@@ -312,9 +313,7 @@ void taskManager::deliverCheckCallback(const std_msgs::String::ConstPtr& msg)
 
     // send result to server
     currentStatus.setdeliveryCheck(result);
-    // if (netstatus)
-    //     // sendStatusToServer();
-    //     sleep(1);
+
 
 
     // reset check result
@@ -366,7 +365,7 @@ void taskManager::armStatusCallback(const std_msgs::Int32::ConstPtr& msg)
     // (When mani starts) set tray number using for the deliver in this subtask  
     if((msg->data==1 && recentArmStatus==2) && vectorTask.size()!=0) // 우선 manipulate에 회전하는거까지 들어 있으므로 1로 하기
     {   
-        if(getSubtaskName() == "MANIPULATE") {
+        if(getSkillName() == "MANIPULATE") {
             currentStatus.setTrayUsing(((subtask_MANIPULATE*)(vectorTask[currentTask]->subtask[vectorTask[currentTask]->stage]))->trayID);
         }
         // cout << "tray number : " << ((subtask_MANIPULATE*)(vectorTask[currentTask]->subtask[vectorTask[currentTask]->stage]))->trayID << endl;
@@ -392,7 +391,7 @@ void taskManager::armStatusCallback(const std_msgs::Int32::ConstPtr& msg)
 
         maniCheck = false;
 
-        if (getSubtaskName() == "RESET_ARM_POSE"){
+        if (getSkillName() == "RESET_ARM_POSE"){
 	        jsonData["type"] = "ResetArm";
         }
         else jsonData["type"] = "manipulate";
@@ -402,10 +401,10 @@ void taskManager::armStatusCallback(const std_msgs::Int32::ConstPtr& msg)
         Json::StreamWriterBuilder writer;
         std::string jsonstring = Json::writeString(writer, jsonData);
 
-        if(callTaskCallback(jsonData) == -1){
+        if(callSkillCallback(jsonData) == -1){
             return;
         }
-        currentStatus.setTaskInfo(getSubtaskName(), currentTask, vectorTask[currentTask]->stage);     
+        currentStatus.setSkillInfo(vectorSkill[currentSkill]->getSkillName(), currentSkill);     
         // if (netstatus) // when network is alive,
             // sendStatusToServer();      
                 
@@ -484,10 +483,10 @@ void taskManager::leftPoseCallback(const pandemic_task_manager_ros::PlaneEstimat
     Json::StreamWriterBuilder writer;
     std::string jsonstring = Json::writeString(writer, jsonData);
     
-    if(callTaskCallback(jsonData) == -1){
+    if(callSkillCallback(jsonData) == -1){
         return;
     }
-    currentStatus.setTaskInfo(getSubtaskName(), currentTask, vectorTask[currentTask]->stage);
+    currentStatus.setSkillInfo(vectorSkill[currentSkill]->getSkillName(), currentSkill);
     
     // if (netstatus) // when network is alive,
     //     sendStatusToServer();
@@ -544,12 +543,10 @@ void taskManager::rightPoseCallback(const pandemic_task_manager_ros::PlaneEstima
     Json::StreamWriterBuilder writer;
     std::string jsonstring = Json::writeString(writer, jsonData);
     
-    if(callTaskCallback(jsonData) == -1){
+    if(callSkillCallback(jsonData) == -1){
         return;
     }
-    currentStatus.setTaskInfo(getSubtaskName(), currentTask, vectorTask[currentTask]->stage);
-
-
+    currentStatus.setSkillInfo(vectorSkill[currentSkill]->getSkillName(), currentSkill);
 }
 
 void taskManager::armInfoCallback(const pandemic_task_manager_ros::robot_data::ConstPtr& msg)
@@ -574,52 +571,41 @@ void taskManager::armInfoCallback(const pandemic_task_manager_ros::robot_data::C
     currentStatus.setArmInfo(msg);    
 }
 
-string taskManager::getSubtaskName()
-{
-    if (vectorTask.size()==0) return "";
-    if(vectorTask.size() > currentTask) {
-        return vectorTask[currentTask]->subtask[vectorTask[currentTask]->stage]->getSubtaskName();
-    }
-}
-
-int taskManager::clearTasks()
+int taskManager::clearSkills()
 {    
-    vectorTask.clear(); 
-    taskListDelivery.clear(); 
+    vectorSkill.clear(); 
 
-    Json::Value noneTask;
-    currentStatus.setWholeSequence(noneTask);
+    Json::Value noneSkill;
+    currentStatus.setWholeSequence(noneSkill);
 
-    currentTask = 0;   
+    currentSkill = 0;   
 
     emergencyFlag = false;
 }
 
-
-int taskManager::callTaskCallback(Json::Value s)
+int taskManager::callSkillCallback(Json::Value s)
 {
-    if (vectorTask.size()==0) {
+    if (vectorSkill.size()==0) {
         // cout << "no Job assigned... waiting.." << endl; // 나중에 풀기
         return -1;
     }
-    if (currentTask>=vectorTask.size()) { // usually something wrong, clear the vectorTask and end 
-        clearTasks();
+    if (currentSkill>=vectorSkill.size()) { // usually something wrong, clear the vectorTask and end 
+        clearSkills();
     }
 
-    
-    // call subtask callback
-    int taskStatus = vectorTask[currentTask]->callback_Task(s); // step forward to next subtask
+    // call skill callback
+    int skillStatus = vectorSkill[currentSkill]->callback_Skill(s); // step forward to next subtask
 
-    if(taskStatus==0 && vectorTask.size()==currentTask+1){ // when last task finished, size of vectorTask goes 0
-        vectorTask[currentTask]->endTask();   
-        clearTasks();  
+    if(skillStatus==0 && vectorSkill.size()==currentSkill+1){ // when last task finished, size of vectorTask goes 0
+        vectorSkill[currentSkill]->endTask();   
+        clearSkills();  
 
         cout << "Task Done" << endl;
         std_msgs::String speakermp3;
         speakermp3.data = "home_arrived";
         mapPublishers["speaker_pub"]->publish(speakermp3);         
         
-        currentStatus.setTaskInfo("", currentTask, -1); // 목록창 지울 때는 -1 전송
+        currentStatus.setSkillInfo("", currentSkill); // 목록창 지울 때는 -1 전송
         currentStatus.setNotice("Task Done");    
         if (netstatus) // when network is alive,
         {
@@ -628,10 +614,9 @@ int taskManager::callTaskCallback(Json::Value s)
                      
         return -1;
     }
-    else if (taskStatus==0) { // invoke next task
-        vectorTask[currentTask]->endTask();
-        currentTask++;
-        vectorTask[currentTask]->invokeTask();
+    else if (skillStatus==0) { // invoke next task
+        vectorSkill[currentSkill]->invoke_skill();
+        currentSkill++;
     }    
 
 }
@@ -716,10 +701,10 @@ void taskManager::naviStatusCallback(const std_msgs::String::ConstPtr& msg)
         sleep(2);
         cout << "arrived !!!" << endl;
 
-        if(callTaskCallback(s) == -1){ // call next subtask [ex.detect]
+        if(callSkillCallback(s) == -1){ // call next subtask [ex.detect]
             return;
         }
-        currentStatus.setTaskInfo(getSubtaskName(), currentTask, vectorTask[currentTask]->stage);
+        currentStatus.setSkillInfo(vectorSkill[currentSkill]->getSkillName(), currentSkill);
 
     }  
 
@@ -747,10 +732,7 @@ int taskManager::sendStatusToServer()
     jsonData["content"] = sendbuffer;
     Json::StreamWriterBuilder writer;
     std::string jsonstring = Json::writeString(writer, jsonData);
-    // cout << jsonstring << endl;
     tcpSocket->SendJson(jsonstring);
-    // std::cout << jsonstring << std::endl;
-    // std::cout << "taskManager::naviStatusCallback::: jsonstring.size() = " << jsonstring.size() << std::endl;
 }
 
 int taskManager::sendTaskSeqToServer()
@@ -767,16 +749,6 @@ int taskManager::sendTaskSeqToServer()
     tcpSocket->SendJson(jsonstring);
     sleep(1);
 }
-
-// void taskManager::sendJsonToServer(std::string jsonstring)
-// {
-//     uint16_t protocol_signature = 206;
-//     uint32_t message_length = static_cast<uint32_t>(jsonstring.size());
-//     tcpSocket->Send(reinterpret_cast<char*>(&protocol_signature), sizeof(protocol_signature));
-//     tcpSocket->Send(reinterpret_cast<char*>(&message_length), sizeof(message_length));
-//     tcpSocket->Send(jsonstring);
-// }
-
 
 int taskManager::onMessageJobSequence(Json::Value &rMessage)
 {
@@ -807,7 +779,8 @@ int taskManager::onMessageJobSequence(Json::Value &rMessage)
             case "DecideLoad":
                 break;
             case "SwitchFloor":
-                targetFloor  = to_string(rMessage["js"]["floor"].asInt()); 
+                targetFloor = to_string(rMessage["js"]["floor"].asInt()); 
+                infojs["targetfloor"]  = to_string(rMessage["js"]["floor"].asInt()); 
                 infojs["switchMap"] = mapNumCor.at(targetFloor);
                 break;
             case "Detect":
@@ -821,9 +794,8 @@ int taskManager::onMessageJobSequence(Json::Value &rMessage)
             std_msgs::String speakermp3;
             speakermp3.data = "tasknotAssigned";
             mapPublishers["speaker_pub"]->publish(speakermp3); 
-            clearTasks();       
-
-            currentStatus.setTaskInfo("", currentTask, -1);
+            clearSkills();       
+            currentStatus.setSkillInfo("", currentSkill);
             currentStatus.setNotice("Duplicated Tray : Already used");         
             
             return 0;
@@ -831,54 +803,37 @@ int taskManager::onMessageJobSequence(Json::Value &rMessage)
     }
     cout << endl << endl;
 
-    Json::Value jsonWholeTask;
+    Json::Value jsonWholeSkill;
     Json::Value jsonTask;
     Json::Value jsonSubtask;
 
-    for (int ii=0; ii<vectorTask.size(); ii++) {
-        
-        // Task, Subtask 목록 출력
-        cout << "Task: " << vectorTask[ii]->getTaskName() << endl;
-        vectorTask[ii]->listSubTasks(); 
-
+    for (int ii=0; ii<vectorSkill.size(); ii++) {
+        // Skill 목록 출력
+        cout << "Skill: " << vectorSkill[ii]->getSkillName() << endl;
         // 서버로 보내기 위한 job sequence 구성
-        for(int j=0; j<vectorTask[ii]->subtask.size();j++){
-            jsonSubtask.append(vectorTask[ii]->subtask[j]->getSubtaskName());
-        }
-        jsonTask[vectorTask[ii]->getTaskName()] = jsonSubtask;        
-        jsonWholeTask.append(jsonTask);
-
-        jsonTask.clear();
-        jsonSubtask.clear();
+        jsonWholeSkill.append(vectorSkill[ii]->getSkillName());
     }    
     
-    currentStatus.setWholeSequence(jsonWholeTask);    
+    currentStatus.setWholeSequence(jsonWholeSkill);    
     sendTaskSeqToServer(); // 서버로 job sequence 전송
     
     // Task 실행 준비
-    for (int ii=0; ii<vectorTask.size(); ii++) {
-        vectorTask[ii]->stage = 0;
-    }
-    currentTask = 0;
+    currentSkill = 0;
 
     cout << endl;
 
-    currentStatus.setTaskInfo("", currentTask, -1); // 프론트 task 목록 창 지울 때 -1 보내지만 notice가 task assigned이면 목록창 출력
+    currentStatus.setSkillInfo("", currentSkill); // 프론트 task 목록 창 지울 때 -1 보내지만 notice가 task assigned이면 목록창 출력
     currentStatus.setNotice("Task Assigned");
     std_msgs::String speakermp3;
     speakermp3.data = "TaskAssigned";
     mapPublishers["speaker_pub"]->publish(speakermp3); 
-    // if (netstatus) // when network is alive,
-    //     sendStatusToServer();
-
     return 0;
 }
 
 int taskManager::onMessageRequestStart(TCPSocket* tcpSocket)
 {   
-
     cout << "startRequest received.. " << endl;
-    if (vectorTask.size()==0) {
+    if (vectorSkill.size()==0) {
         cout << "   no job assigned.. waiting.." << endl;
         return -1;
     }
@@ -886,15 +841,12 @@ int taskManager::onMessageRequestStart(TCPSocket* tcpSocket)
     speakermp3.data = "TaskStart";
     mapPublishers["speaker_pub"]->publish(speakermp3); 
     
-    cout << "  currentTask.. " << currentTask<< endl;
-    vectorTask[currentTask]->invokeTask();    
-    cout << "currentTask = " << vectorTask[currentTask]->getTaskName() << ", currentSubTask = " << getSubtaskName() << endl;
-    cout << "currentTaskID = " << currentTask << endl;
+    vectorSkill[currentSkill]->invoke_skill();    
+    cout << "currentSkill = " << vectorSkill[currentSkill]->getSkillName() << endl;
+    cout << "currentSkillID = " << currentSkill << endl;
  
-    currentStatus.setTaskInfo(getSubtaskName(), currentTask, vectorTask[currentTask]->stage);
-    // currentStatus.setNotice("Task Start");
-    // if (netstatus) // when network is alive,
-    //     sendStatusToServer();
+    currentStatus.setSkillInfo(vectorSkill[currentSkill]->getSkillName(), currentSkill);
+    currentStatus.setNotice("Task Start");
 
     return 0;
 }
@@ -902,17 +854,15 @@ int taskManager::onMessageRequestStart(TCPSocket* tcpSocket)
 int taskManager::onMessageRequestTaskClear(TCPSocket* tcpSocket)
 {
     cout << "Request for clearing all tasks received.. " << endl;
-    // if(vectorTask.size() > 0){
-        clearTasks();
+    if(vectorSkill.size() > 0){
+        clearSkills();
         initializeLoadmap(); //
-        currentStatus.setTaskInfo(getSubtaskName(), currentTask, -1); 
+        currentStatus.setSkillInfo("", currentSkill); 
         currentStatus.setNotice("Task not assigned");
         currentStatus.setHoldStatus("off");
         if (netstatus) // when network is alive,
             sendTaskSeqToServer();
-            // sendStatusToServer();   
-         
-    // }
+    }
 
     return 0;
 }
@@ -920,7 +870,6 @@ int taskManager::onMessageRequestTaskClear(TCPSocket* tcpSocket)
 int taskManager::onMessageRequestRosCmd(Json::Value &rMessage)
 {
     cout << "Command received.. " << rMessage["js"] << endl;
-
     // publsih
     string rosCmd = rMessage["js"].asString();
     system(rosCmd.c_str());
@@ -943,15 +892,12 @@ int taskManager::onMessageRequestEmergency(TCPSocket* tcpSocket)
 
     mapPublishers["emergency_pub"] -> publish(emMsg);
 
-
     // 모든 task 삭제
-    clearTasks();    
+    clearSkills();    
     emergencyFlag = true;   
 
-    currentStatus.setTaskInfo("", currentTask, -1);
+    currentStatus.setSkillInfo("", currentSkill);
     currentStatus.setNotice("EMERGENCY");
-    // if (netstatus) // when network is alive,
-    //     sendStatusToServer();
 
     return 0;
 }
@@ -964,14 +910,11 @@ int taskManager::onMessageResponsePrepareLoad(TCPSocket* tcpSocket)
     Json::StreamWriterBuilder writer;
     std::string jsonstring = Json::writeString(writer, jsonData);
 
-    if(callTaskCallback(jsonData) == -1){
+    if(callSkillCallback(jsonData) == -1){
         return 0;
     }
+    currentStatus.setSkillInfo(vectorSkill[currentSkill]->getSkillName(), currentSkill);
 
-    currentStatus.setTaskInfo(getSubtaskName(), currentTask, vectorTask[currentTask]->stage);
-
-    // if (netstatus) // when network is alive,
-    //     sendStatusToServer();
 }
 
 int taskManager::onMessageResponseRePrepareLoad(TCPSocket* tcpSocket)
@@ -984,14 +927,10 @@ int taskManager::onMessageResponseRePrepareLoad(TCPSocket* tcpSocket)
     Json::StreamWriterBuilder writer;
     std::string jsonstring = Json::writeString(writer, jsonData);
 
-    if(callTaskCallback(jsonData) == -1){
+    if(callSkillCallback(jsonData) == -1){
         return 0;
     }
-
-    currentStatus.setTaskInfo(getSubtaskName(), currentTask, vectorTask[currentTask]->stage);
-
-    // if (netstatus) // when network is alive,
-    //     sendStatusToServer();
+    currentStatus.setSkillInfo(vectorSkill[currentSkill]->getSkillName(), currentSkill);
 }
 
 
@@ -1005,11 +944,10 @@ int taskManager::onMessageResponseSwitchFloor(TCPSocket* tcpSocket)
     Json::StreamWriterBuilder writer;
     std::string jsonstring = Json::writeString(writer, jsonData);
 
-    if(callTaskCallback(jsonData) == -1){
+    if(callSkillCallback(jsonData) == -1){
         return 0;
     }
-
-    currentStatus.setTaskInfo(getSubtaskName(), currentTask, vectorTask[currentTask]->stage);
+    currentStatus.setSkillInfo(vectorSkill[currentSkill]->getSkillName(), currentSkill);
 }
 
 
@@ -1027,7 +965,7 @@ int taskManager::onMessageRequestStopWait(Json::Value &rMessage)
         cout << "   no job assigned.." << endl;
         return -1;
     }
-    else if(getSubtaskName().compare("MOVETO") == 0 || getSubtaskName().compare("MOVETOEV") == 0){ 
+    else if(getSkillName().compare("MOVETO") == 0 || getSkillName().compare("MOVETOEV") == 0){ 
         std_msgs::String rosGoMsg;
         rosGoMsg.data = rMessage["sg"].asString();     // stop, go가 들어가있는 key
         mapPublishers["conaGo_pub"]->publish(rosGoMsg);  // "/cona/cmd" 토픽으로 subtask 보내줌(모든 subtask동일)
@@ -1050,7 +988,7 @@ int taskManager::onMessageRequestStopWait(Json::Value &rMessage)
         cout << "   Current subtask is not WAIT.." << endl;
         return -1;
     }
-    currentStatus.setTaskInfo(getSubtaskName(), currentTask, vectorTask[currentTask]->stage);
+    currentStatus.setSkillInfo(vectorSkill[currentSkill]->getSkillName(), currentSkill);
 
     return 0;
 }
@@ -1133,34 +1071,12 @@ int taskManager::onMessageRequestReboot(Json::Value &rMessage)
     }
 }
 
-int taskManager::onMessageManualNextTask(Json::Value &rMessage)
+int taskManager::onMessageManualNextSkill(Json::Value &rMessage)
 {
-    vectorTask[currentTask]->endTask();
-    currentTask++;
-    vectorTask[currentTask]->invokeTask();
-
-    currentStatus.setTaskInfo(getSubtaskName(), currentTask, vectorTask[currentTask]->stage);
-
+    vectorSkill[currentTask]->invoke_skill();
+    currentSkill++;
+    currentStatus.setSkillInfo(vectorSkill[currentSkill]->getSkillName(), currentSkill);
 }
-
-
-
-// int taskManager::onMessageResponseNode(Json::Value &rMessage)
-// {
-//     std_msgs::String map;
-//     std::stringstream mapLoad;
-
-//     std::string floor = rMessage["floor"].asString();
-//     std::string whichMap = mapNumCor.at(floor);
-
-//     mapLoad << whichMap;
-//     map.data = mapLoad.str();
-//     mapPublishers["map_loader"]->publish(map);
-
-//     currentStatus.setfloorID(stoi(floor));
-// }
-
-
 
 int taskManager::loadConfig(string filename) {
   Json::Value root;
@@ -1182,8 +1098,6 @@ int taskManager::loadConfig(string filename) {
   
   std::string homeLoc = root["home"].asString();
   std::string startLoc = root["start"].asString();
-
-  
 
   cout << "int taskManager::loadConfig(string filename)" << endl << "===========================" << endl;
   cout << "RobotName = " << name << endl;
@@ -1286,7 +1200,6 @@ int taskManager::setHomeLocation(string homeloc){
     currentStatus.setHomePlace(homeloc);
 }
 
-
 int taskManager::setStartLocation(string startloc){
     start = startloc;
     currentStatus.setStartPlace(startloc);
@@ -1376,104 +1289,73 @@ int taskManager::addSkill_MoveTo(Json::Value params, taskManager* pt){
     std::string locationSTR = params["locationStr"].asString();
 
     cout << "location = " << locationID << ", Place = "  << locationSTR << endl;
-    {
-        auto ret = pt->taskListDelivery.insert({ trayID, locationID });
 
-        if (!ret.second) { //already trayID is used
+    skill_MoveTo* skill = new skill_MoveTo;
+    skill->set_skill(params,&pt->nh_,pt->mapPublishers);// setting skill parameter
+    pt->vectorSkill.push_back(skill);
+}
+
+int taskManager::addSkill_Detect(Json::Value params, taskManager* pt){
+
+    cout << "Detect" << endl;
+
+    skill_Detect* skill = new skill_Detect;
+    skill->set_skill(params,pt->mapPublishers);
+
+    pt->vectorSkill.push_back(skill);
+}
+
+int taskManager::addSkill_Manipulate(Json::Value params, taskManager* pt){
+    int trayID = params["tray"].asInt();
+
+    cout << "trayID = " << trayID << endl;
+    {
+        taskListDelivery.push_back(trayID);
+        auto result = unique_trayID.insert(trayID);
+        if (!result.second) { //already trayID is used
             cout << "error in addSkill, trayID " << trayID << " is already used in the task list." << endl;
             return 1;
         }
         else {
-            skill_MoveTo* task = new skill_MoveTo;
-            skill->setSkill(params,&pt->nh_,pt->mapPublishers);//, &pt->pub_left, &pt->pub_right, &pt->conaGo_pub);
+            skill_Manipulate* skill = new skill_Manipulate;
+            skill->set_skill(params,&pt->nh_,pt->mapPublishers);//, &pt->pub_left, &pt->pub_right, &pt->conaGo_pub);
             pt->vectorSkill.push_back(skill);
         }
     }
 }
 
-
-
-
-
-
-
-
-
-
-int taskManager::addSkill_Detect(Json::Value params, taskManager* pt){
-    int trayID = params["tray"].asInt();
+int taskManager::addSkill_SetEvEms(Json::Value params, taskManager* pt){
     int locationID = params["location"].asInt();
     std::string locationSTR = params["locationStr"].asString();
 
     cout << "location = " << locationID << ", Place = "  << locationSTR << endl;
-    //pt->addDeliveryTask(trayID, locationID);
-    {
-        auto ret = pt->taskListDelivery.insert({ trayID, locationID });
 
-        if (!ret.second) { //already trayID is used
-            cout << "error in addSkill, trayID " << trayID << " is already used in the task list." << endl;
-            return 1;
-        }
-        else {
-            task_MOVE* task = new task_MOVE;
-            task->setTask(params,&pt->nh_,pt->mapPublishers);//, &pt->pub_left, &pt->pub_right, &pt->conaGo_pub);
-
-
-            pt->vectorTask.push_back(task);
-        }
-    }
-
-}
-
-int taskManager::addSkill_RESETARM(Json::Value params, taskManager* pt){
-    int trayID = params["tray"].asInt();
-    int locationID = params["location"].asInt();
-    std::string locationSTR = params["locationStr"].asString();
-
-    cout << "location = " << locationID << ", Place = "  << locationSTR << endl;
-    //pt->addDeliveryTask(trayID, locationID);
-    {
-        auto ret = pt->taskListDelivery.insert({ trayID, locationID });
-
-        if (!ret.second) { //already trayID is used
-            cout << "error in addSkill, trayID " << trayID << " is already used in the task list." << endl;
-            return 1;
-        }
-        else {
-            task_RESETARM* task = new task_RESETARM;
-            task->setTask(params,&pt->nh_,pt->mapPublishers);//, &pt->pub_left, &pt->pub_right, &pt->conaGo_pub);
-
-
-            pt->vectorTask.push_back(task);
-        }
-    }
-
+    skill_SetEvEms* skill = new skill_SetEvEms;
+    skill->set_skill(params,&pt->nh_,pt->mapPublishers);// setting skill parameter
+    pt->vectorSkill.push_back(skill);
 }
 
 
-int taskManager::addSkill_SWITCHFLOOR(Json::Value params, taskManager* pt){
+
+int taskManager::addSkill_PrepareLoad(Json::Value params, taskManager* pt){
+    cout << "Source Floor = " << params["sourceFloor"].asInt() << endl;
+    skill_PrepareLoad* skill = new skill_PrepareLoad;
+    skill->set_skill(params,&pt->nh_,pt->mapPublishers, pt->tcpSocket);
+    pt->vectorSkill.push_back(skill);
+}
+
+int taskManager::addSkill_DecideLoad(Json::Value params, taskManager* pt){
     
-    cout << "Source Floor = " << params["sourceFloor"].asInt() << ", Target Floor = "  << params["targetFloor"].asInt() 
-        << " Switch Map = " << params["switchMap"] << endl;
-
-    task_SWITCHFLOOR* task = new task_SWITCHFLOOR;
-    task->setTask(params,&pt->nh_,pt->mapPublishers, pt->tcpSocket);
-
-    pt->vectorTask.push_back(task);
-
+    cout << "Decide Load" << endl;
+    skill_DecideLoad* skill = new skill_DecideLoad;
+    skill->set_skill(params,&pt->nh_,pt->mapPublishers, pt->tcpSocket);
+    pt->vectorSkill.push_back(skill);
 }
 
-int taskManager::addSkill_HOME(Json::Value params, taskManager* pt){
-
-    int locationID = params["location"].asInt();
-    std::string locationSTR = params["locationStr"].asString();
-
-    cout << "location = " << locationID << ", Place = "  << locationSTR << endl;
-
-    task_HOME* task = new task_HOME;
-   // task->setTask(params,&pt->nh_,&cmdGUI, &pub_left, &pub_right, &conaGo_pub);
-   // task->setTask(params,&pt->nh_,&pt->cmdGUI, &pt->pub_left, &pt->pub_right, &pt->conaGo_pub);
-    task->setTask(params,&pt->nh_,pt->mapPublishers);//>cmdGUI, &pt->pub_left, &pt->pub_right, &pt->conaGo_pub);
-
-    pt->vectorTask.push_back(task);
+int taskManager::addSkill_SwitchFloor(Json::Value params, taskManager* pt){
+    
+    cout << "Target Floor = "  << params["targetFloor"].asInt() << endl;
+    skill_SwitchFloor* skill = new skill_SwitchFloor;
+    skill->set_skill(params,&pt->nh_,pt->mapPublishers, pt->tcpSocket);
+    pt->vectorSkill.push_back(skill);
 }

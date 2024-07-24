@@ -48,7 +48,7 @@ public:
     int updateNaviStatus(Json::Value nStatus);
     int setNaviGoal(string goal);
     
-    int setTaskInfo(string subtask, int taskID, int subtaskID);
+    int setSkillInfo(string skill, int skillID);
     int writeRobotStatus(Json::Value &nStatus);
     
     int setWholeSequence(Json::Value eachTask);

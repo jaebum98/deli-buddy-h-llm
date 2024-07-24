@@ -46,26 +46,22 @@ public:
     int connectToServerev(std::string host, uint16_t port);
 
     // static int addSkill_WAIT         (Json::Value params, taskManager* pt);
-    static int addSkill_DELIVER      (Json::Value params, taskManager* pt);
-    static int addSkill_MOVE         (Json::Value params, taskManager* pt);
-    static int addSkill_RESETARM     (Json::Value params, taskManager* pt);
-    static int addSkill_HOME         (Json::Value params, taskManager* pt);
-    static int addSkill_DEMOHOME     (Json::Value params, taskManager* pt);
-    static int addSkill_CHARGE       (Json::Value params, taskManager* pt);
-    static int addSkill_ESTOP        (Json::Value params, taskManager* pt);
-    static int addSkill_DEMODELIVER  (Json::Value params, taskManager* pt);
-    static int addSkill_SWITCHFLOOR  (Json::Value params, taskManager* pt);
+    static int addSkill_MoveTo       (Json::Value params, taskManager* pt);
+    static int addSkill_Detect       (Json::Value params, taskManager* pt);
+    static int addSkill_Manipulate   (Json::Value params, taskManager* pt);
+    static int addSkill_SetEvEms     (Json::Value params, taskManager* pt);
+    static int addSkill_PrepareLoad  (Json::Value params, taskManager* pt);
+    static int addSkill_DecideLoad   (Json::Value params, taskManager* pt);
+    static int addSkill_SwitchFloor  (Json::Value params, taskManager* pt);
 
     int addSkill(Json::Value nStatus);
-    int addDeliveryTask(int trayID, int locationID);
-    int listTask();
 
     map<string,int(*)(Json::Value, taskManager*)> addSkillFunctions;
-    vector <taskBase*> vectorTask;
-    vector <subtaskBase*> vectorSubTask;
+
+    vector <skillBase*> vectorSkill;
 
     ros::NodeHandle nh_; 
-    int currentTask;
+    int currentSkill;
 
     map<string,string>  evLocation;
     map<string,float>  evDistance;
@@ -141,15 +137,7 @@ public:
     int sendTaskSeqToServer();
     int sendInitDataToServer(); // task info
 
-    // void sendJsonToServer(std::string jsonstring);
-    // int processStatus(int status){
-    //     int nextstatus;
-    //     if(status == 0) nextstatus = 1;
-    //     else if(status == 1) nextstatus = 0;
-    //     return nextstatus;
-    // }
-
-    string getSubtaskName();
+    string getSkillName();
 
     // for decide_load subtask
     float evobs;
@@ -180,8 +168,8 @@ public:
     ros::ServiceClient vision_client, cona_client, nuc_client;
 
     map<string,ros::Publisher*> mapPublishers;
-    
-    map<int,int> taskListDelivery; // tray and location ; primary key is tray. // insert 부분까지 주석처리
+    std::vector<int> taskListDelivery; // tray 중복확인
+    std::unordered_set<int> unique_trayID;
     vector<pair<int,int>> orderedTask; // after ordering the task.. 
 
     bool emergencyFlag = false;
@@ -200,5 +188,3 @@ public:
     int obscheck = 0;
     // int absol_pose_cnt = 0; // absol pose callback func cnt (only call when cnt is 10)
 };
-
-

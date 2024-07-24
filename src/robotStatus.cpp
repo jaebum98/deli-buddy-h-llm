@@ -135,22 +135,20 @@ int robotStatus::setmanipModuleStatus(int ms)
     manipModuleStatus = ms;
 }
 
-int robotStatus::setTaskInfo(string subtask, int taskID, int subtaskID)
+int robotStatus::setSkillInfo(string skill, int skillID)
 {
-    // cout << subtask << taskID << subtaskID << endl;
-	currentSubTask = subtask;
-    currentTaskID = taskID;
-    currentSubTaskID = subtaskID;
+	currentSkill = skill;
+    currentSkillID = skillID;
 }
 
-int robotStatus::setWholeSequence(Json::Value wholeTasks) // job 할당할 때, clear 할 때 호출
+int robotStatus::setWholeSequence(Json::Value wholeSkills) // job 할당할 때, clear 할 때 호출
 { 
-    if(wholeTasks.size() != 0)          wholeSequence = wholeTasks;   
-    else                                wholeSequence.clear();  
+    if(wholeSkills.size() != 0)          wholeSequence = wholeSkills;   
+    else                                 wholeSequence.clear();  
 
-    numTotalTasks = wholeSequence.size();
+    numTotalSkills = wholeSequence.size();
     
-    // cout << numTotalTasks << endl;                       
+    // cout << numTotalSkills << endl;                       
 }
 
 int* robotStatus::getarm1axis(){ // return arm1axis array
@@ -318,7 +316,7 @@ int robotStatus::writeTaskSequence(Json::Value &taskSeq)
 {
     taskSeq["lk"] = robotName;
     taskSeq["ts"] = wholeSequence; 
-    taskSeq["ntt"] = numTotalTasks;
+    taskSeq["ntt"] = numTotalSkills;
 }
 
 int robotStatus::writeRobotinitdata(Json::Value &InitData)
@@ -334,68 +332,3 @@ int robotStatus::writeRobotNodeStatusdata(Json::Value &NodeData)
     NodeData["lk"] = robotName;  // 기존 getRobotName을 없애고 통합
     NodeData["nd"] = Node_status;
 }
-
-// int robotStatus::addTask(Json::Value nTask)
-// {
-//     string task = nTask["task"].asString();
-//     auto iter = addSubTaskFunctions.find(task);
-//     if (iter == addSubTaskFunctions.end())
-//     {
-//         // not found
-//         cout << "addTask something wrong, Task " << task << " undefined " << endl;
-//     }
-//     else
-//         addSubTaskFunctions[task](nTask["action"], this);
-// }
-
-// int robotStatus::addSubTask_WAIT(Json::Value params, robotStatus* pt){
-//     cout << "robotStatus::addSubTask_WAIT(Json::Value params) not yet implemented" << endl;
-// }
-
-// int robotStatus::addSubTask_DELIVER(Json::Value params, robotStatus* pt){
-//     int trayID = params["tray"].asInt();
-//     int locationID = params["location"].asInt();
-//     cout << params << endl;
-//     cout << "trayID = " << trayID  << ", location = " << locationID << endl;
-//     pt->addDeliveryTask(trayID, locationID);
-
-//     cout << "robotStatus::addSubTask_HOME(Json::Value params) for testing" << endl;
-
-// }
-
-// int robotStatus::addSubTask_HOME(Json::Value params, robotStatus* pt){
-//     cout << "robotStatus::addSubTask_HOME(Json::Value params) not yet implemented" << endl;
-
-// }
-// int robotStatus::addSubTask_CHARGE(Json::Value params, robotStatus* pt){
-//     cout << "robotStatus::addSubTask_CHARGE(Json::Value params) not yet implemented" << endl;
-
-// }
-
-// int robotStatus::addSubTask_ESTOP(Json::Value params, robotStatus* pt){
-//     cout << "robotStatus::addSubTask_ESTOP(Json::Value params) not yet implemented" << endl;
-
-// }
-
-
-// int robotStatus::addDeliveryTask(int trayID, int locationID)
-// {
-//     auto ret = taskListDelivery.insert({ trayID, locationID });
-
-//     if (!ret.second) { //already trayID is used
-//         cout << "error in addTask, trayID " << trayID << " is already used in the task list." << endl;
-//         return 1;
-//     }
-//     else return 0;
-// }
-
-// int robotStatus::listTask()
-// {
-//     cout << "size of current Task = " << taskListDelivery.size() << endl;
-//     std::map<int,int>::iterator it;
-//     for(it=taskListDelivery.begin(); it!=taskListDelivery.end(); ++it) {
-//         printf("trayID : %d", it->first);
-//         printf("  locationID : %d \n", it->second);
-//     }
-// }
-
