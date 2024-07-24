@@ -119,7 +119,7 @@ int task_SWITCHFLOOR::setTask(Json::Value js,ros::NodeHandle* nodehandle, map<st
     subtask_SWITCH* switch_floor = new subtask_SWITCH;
     switch_floor->setSubtask(js, mPubs, ts);  
 
-    // subtask.push_back(reset_arm_pose);  // arm -1
+    // subtask.push_back(reset_arm_pose);// arm -1
     subtask.push_back(moveto1);      // 엘리베이터 문 앞으로 이동
     subtask.push_back(set_evdock);  // go to , ems명령으로 사물인지 과정 세팅
     subtask.push_back(prepare_load); // call ev and door open
