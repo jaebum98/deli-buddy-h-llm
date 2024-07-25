@@ -1,55 +1,6 @@
 #include <ros/ros.h>
 #include <std_msgs/String.h>
 #include <vector>
-// #include "tcpsocket.hpp"
-// #include <iostream>
-
-// #include <json/json.h>
-// #include <json/writer.h>
-
-// using namespace std;
-
-// vector <int> location;
-// vector <int> task;
-
-// int onMessageJobSequence(Json::Value &rMessage) {
-//     cout << "jobsequence received.. calling path planner" << endl;
-//     // parsing job sequence.. need to revise
-//     // cout << rMessage << endl;
-//     for (int ii=0; ii<rMessage["js"].size(); ii++) {
-//         location.push_back(rMessage["js"][ii]["location"].asInt());
-//         task.push_back(rMessage["js"][ii]["tray"].asInt());
-//     }
-//     for (int ii=0; ii<location.size(); ii++) {
-//         cout << "location " << location[ii] << ", tray = " << task[ii] << endl;
-//     }
-//     return 0;
-// }
-
-// int onMessageRequestStatus(TCPSocket& tcpSocket) {
-//     cout << "statusRequest received.. sending status" << endl;
-//     {
-//         Json::Value jsonData;
-//         jsonData["type"] = "STATUS";
-//         Json::Value robotStatus;
-//         robotStatus["logKey"] = "sdfasdfasdead;";
-//         robotStatus["rID"] = 45;
-//         robotStatus["posx"] = 111.5;
-//         robotStatus["posy"] = -22.5;
-//         robotStatus["memo"] = "none";
-//         jsonData["content"] = robotStatus;
-
-//         Json::StreamWriterBuilder writer;
-//         std::string jsonstring = Json::writeString(writer, jsonData);
-//         std::cout << "from ros" << std::endl;
-//         std::cout << jsonstring << std::endl;
-
-//         std::cout << "jsonstring.size() = " << jsonstring.size() << std::endl;
-
-//         // Send an initial buffer
-//         tcpSocket.Send(jsonstring);
-//     }
-// }
 
 #include "taskManager/taskManager.h"
 using namespace std;
@@ -57,13 +8,13 @@ using namespace std;
 int main(int argc, char **argv)
 {
     
-    ros::init(argc, argv, "pandemic_task_manager_ros_node");
+    ros::init(argc, argv, "task_manager_llm_node");
     ros::NodeHandle nh;
     ros::Publisher chatter_pub = nh.advertise<std_msgs::String>("rosTaskManager", 1000);
     ros::Rate loop_rate(10);
     
     taskManager tf(&nh);
-    tf.loadConfig("/home/vision/catkin_ws/src/pandemic_task_manager_ros/src/config.json");
+    tf.loadConfig("/home/vision/catkin_ws/src/task_manager_llm/src/config.json");
     //tf.setRobotName("pandemic101");
     //tf.connectToServer("161.122.114.48",5000);
     // Initialize socket.

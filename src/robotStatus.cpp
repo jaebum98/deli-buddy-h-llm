@@ -73,20 +73,6 @@ int robotStatus::updateNaviStatus(Json::Value nStatus)
     naviType       = nStatus["type"].asString();
     naviStatus      = nStatus["status"].asString();  
 
-    // cout << "updateNaviStatus() : naviReady2Work = " << naviReady2Work  << ", naviState = " << naviState << ", naviStatus = " << naviStatus << endl;
-
-    // string snaviTo          = nStatus["to"].asString(); 
-    // string snaviNext        = nStatus["next"].asString(); 
-    // string snaviProgress    = nStatus["progress"].asString();
-    // string sbatteryLevel    = nStatus["battery"].asString(); 
-
-    //naviTo          = stoi(snaviTo      );
-    //naviNext        = stoi(snaviNext    ); 
-    //naviProgress    = stoi(snaviProgress); 
-    //batteryLevel    = stoi(sbatteryLevel); 
-
-    //cout << "naviTo = " << naviTo  << ", naviProgress = " << naviProgress << ", batteryLevel = " << batteryLevel << endl;
-
     return 0;
 }
 
@@ -95,11 +81,6 @@ int robotStatus::setNaviGoal(string goal)
     naviGoal = goal;
 }
 
-// int robotStatus::setSubtaskName(string subtask)
-// {
-//     // cout << tt << endl;
-// 	currentSubTask = subtask;
-// }
 
 int robotStatus::setNotice(string noticeStr)
 {
@@ -160,7 +141,7 @@ int robotStatus::setjoyStatus(string joystatus)
     joy = joystatus;
 }
 
-int robotStatus::setArmInfo(const pandemic_task_manager_ros::robot_data::ConstPtr& msg)
+int robotStatus::setArmInfo(const task_manager_llm::robot_data::ConstPtr& msg)
 {   
 
     arm_robot_state = msg->robot_state;
@@ -251,13 +232,12 @@ int robotStatus::writeRobotStatus(Json::Value &nStatus)
     nStatus["nss"] = naviStatus; 
     nStatus["goal"] = naviGoal; // added
 
-    nStatus["st"] = currentSubTask;
-    nStatus["ctid"] = currentTaskID;
-    nStatus["cstid"] = currentSubTaskID;
+    nStatus["cs"] = currentSkill;
+    nStatus["csid"] = currentSkillID;
 
 
     // notice
-    if(currentTaskID >= 0 && currentSubTaskID >= 0){
+    if(currentSkillID >= 0){
         nStatus["nt"] = "Task Start";
     }
     else{

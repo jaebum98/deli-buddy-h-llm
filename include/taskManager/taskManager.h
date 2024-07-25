@@ -8,17 +8,15 @@
 #include <vector>
 #include "tcpsocket.hpp"
 #include <iostream>
+#include <unordered_set>
 
 #include <jsoncpp/json/json.h>
 #include <jsoncpp/json/writer.h>
 #include "taskManager/robotStatus.h"
-#include <pandemic_task_manager_ros/PlaneEstimation.h>
-#include <pandemic_task_manager_ros/robot_data.h>
+#include <task_manager_llm/PlaneEstimation.h>
+#include <task_manager_llm/robot_data.h>
 #include "std_srvs/Trigger.h"
-#include "pandemic_task_manager_ros/taskmanager_srv.h"
-// #include </home/jskimlab/Desktop/PandemicDeliveryBot/src/service_vision/plane_estimation/include/plane_estimation_class.h>
-
-//#include "taskManager/task.h"
+#include "task_manager_llm/taskmanager_srv.h"
 
 using namespace std;
 
@@ -45,7 +43,6 @@ public:
     int connectToServer(std::string host, uint16_t port);
     int connectToServerev(std::string host, uint16_t port);
 
-    // static int addSkill_WAIT         (Json::Value params, taskManager* pt);
     static int addSkill_MoveTo       (Json::Value params, taskManager* pt);
     static int addSkill_Detect       (Json::Value params, taskManager* pt);
     static int addSkill_Manipulate   (Json::Value params, taskManager* pt);
@@ -93,14 +90,14 @@ public:
     void initializePublishers();
     void initializeServiceClients();
     void naviStatusCallback(const std_msgs::String::ConstPtr& msg);
-    void leftPoseCallback(const pandemic_task_manager_ros::PlaneEstimation::ConstPtr& msg);
-    void rightPoseCallback(const pandemic_task_manager_ros::PlaneEstimation::ConstPtr& msg);
+    void leftPoseCallback(const task_manager_llm::PlaneEstimation::ConstPtr& msg);
+    void rightPoseCallback(const task_manager_llm::PlaneEstimation::ConstPtr& msg);
     void cmdMappingNavi(const std_msgs::String::ConstPtr& msg);
     void armStatusCallback(const std_msgs::Int32::ConstPtr& msg);
     void deliverCheckCallback(const std_msgs::String::ConstPtr& msg);
     void absolPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
     void manualCommandCallback(const std_msgs::String::ConstPtr& msg);
-    void armInfoCallback(const pandemic_task_manager_ros::robot_data::ConstPtr& msg);
+    void armInfoCallback(const task_manager_llm::robot_data::ConstPtr& msg);
     // void evLoadStatusCallback(const std_msgs::String::ConstPtr& msg);
     void edockresultCallback(const std_msgs::Float64::ConstPtr& msg);
     void keyboardCallback(const std_msgs::String::ConstPtr& msg);
@@ -121,14 +118,14 @@ public:
     int onMessageResponseLoadMap(Json::Value &rMessage);
     int onMessageRequestNodeStatus(Json::Value &rMessage);
     int onMessageRequestReboot(Json::Value &rMessage);
-    int onMessageManualNextTask(Json::Value &rMessage);
+    int onMessageManualNextSkill(Json::Value &rMessage);
 
     //전시회 용
     int onMessageRequestStartOffline();
     int onMessageRequestTaskClearOffline();
 
-    int callTaskCallback(Json::Value js);
-    int clearTasks();
+    int callSkillCallback(Json::Value js);
+    int clearSkills();
 
     int onSendConnect(TCPSocket* tcpSocket);
 

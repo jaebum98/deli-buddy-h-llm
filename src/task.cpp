@@ -5,7 +5,7 @@
 using namespace std;
 
 // js : params
-int skill_MoveTo::set_skill(Json::Value js, ros::NodeHandle* nodehandle, map<string,ros::Publisher*> mPubs){
+int skill_MoveTo::set_skill(Json::Value js, map<string,ros::Publisher*> mPubs){
     skillBase::set_skill(js, mPubs);    
     locationID = js["location"].asString();
     locationStr = js["locationStr"].asString();
@@ -53,7 +53,7 @@ int skill_MoveTo::callback_skill(Json::Value js){
     return status;
 }
 // -------------------------------------------------------------------------------------- //
-int skill_Detect::set_skill(Json::Value js, ros::NodeHandle* nodehandle, map<string,ros::Publisher*> mPubs){
+int skill_Detect::set_skill(Json::Value js, map<string,ros::Publisher*> mPubs){
     skillBase::set_skill(js, mPubs);    
     request_side = 0;
     // if(js["tray"].asInt() >= 1 && js["tray"].asInt() <= 8) request_side = 0;
@@ -135,7 +135,7 @@ int skill_Detect::callback_skill(Json::Value js){
 
 // -------------------------------------------------------------------------------------- //
 
-int skill_Manipulate::set_skill(Json::Value js, ros::NodeHandle* nodehandle, map<string,ros::Publisher*> mPubs){
+int skill_Manipulate::set_skill(Json::Value js, map<string,ros::Publisher*> mPubs){
     skillBase::set_skill(js, mPubs);    
     trayID = js["tray"].asInt();
 }
@@ -192,9 +192,9 @@ int skill_Manipulate::callback_skill(Json::Value js){
 
 // -------------------------------------------------------------------------------------- //
 
-int skill_PrepareLoad::set_skill(Json::Value js, ros::NodeHandle* nodehandle, map<string,ros::Publisher*> mPubs, TCPSocket* ts){
+int skill_PrepareLoad::set_skill(Json::Value js, map<string,ros::Publisher*> mPubs, TCPSocket* ts){
     skillBase::set_skill(js, mPubs);
-    source = js["sourceFloor"].asString(); // 3
+    sourceFloor = js["sourceFloor"].asString(); // 3
     tcpSocket = ts;
 }
 
@@ -212,7 +212,7 @@ int skill_PrepareLoad::invoke_skill(){
  
     Json::Value sendbuffer;
     sendbuffer["data"] = "prepareLoad";
-    sendbuffer["source"] = source;
+    sendbuffer["source"] = sourceFloor;
     sendbuffer["lk"] = "pandemic201";
     Json::Value jsonData;
     jsonData["type"] = "evReq";
@@ -241,7 +241,7 @@ int skill_PrepareLoad::callback_skill(Json::Value js){
 
 // -------------------------------------------------------------------------------------- //
 
-int skill_SetEvEms::set_skill(Json::Value js, ros::NodeHandle* nodehandle, map<string,ros::Publisher*> mPubs){
+int skill_SetEvEms::set_skill(Json::Value js, map<string,ros::Publisher*> mPubs){
     skillBase::set_skill(js, mPubs);    
     locationID = js["location"].asString();
     locationStr = js["locationStr"].asString();
@@ -293,7 +293,7 @@ int skill_SetEvEms::callback_skill(Json::Value js){
 
 // -------------------------------------------------------------------------------------- //
 
-int skill_DecideLoad::set_skill(Json::Value js, ros::NodeHandle* nodehandle, map<string,ros::Publisher*> mPubs, TCPSocket* ts){
+int skill_DecideLoad::set_skill(Json::Value js, map<string,ros::Publisher*> mPubs, TCPSocket* ts){
     skillBase::set_skill(js, mPubs);    
     tcpSocket = ts;
 }
@@ -419,7 +419,7 @@ int skill_DecideLoad::callback_skill(Json::Value js){
 
 // -------------------------------------------------------------------------------------- //
 
-int skill_SwitchFloor::set_skill(Json::Value js, ros::NodeHandle* nodehandle, map<string,ros::Publisher*> mPubs, TCPSocket* ts){
+int skill_SwitchFloor::set_skill(Json::Value js, map<string,ros::Publisher*> mPubs, TCPSocket* ts){
     skillBase::set_skill(js, mPubs);   
 
     tcpSocket = ts;

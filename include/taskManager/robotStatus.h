@@ -11,7 +11,7 @@
 
 #include <jsoncpp/json/json.h>
 #include <jsoncpp/json/writer.h>
-#include <pandemic_task_manager_ros/robot_data.h>
+#include <task_manager_llm/robot_data.h>
 
 using namespace std;
 
@@ -59,7 +59,7 @@ public:
     int writeRobotNodeStatusdata(Json::Value &NodeData);
     
     int setNotice(string noticeStr);
-    int setArmInfo(const pandemic_task_manager_ros::robot_data::ConstPtr& msg);
+    int setArmInfo(const task_manager_llm::robot_data::ConstPtr& msg);
 
     int* getarm1axis();
     int setjoyStatus(string joy);
@@ -121,11 +121,9 @@ private:
     string vision2State;      // 'off','requested','responsed'
     string deliveryCheck="None";
 	
-    string currentSubTask="None";
-    string currentTask="None";
-    int currentTaskID=-1;
-    int currentSubTaskID=-1; // 현재 진행 중인 task 1개 내에서의 subtask index
-    int numTotalTasks=-1;
+    string currentSkill="None";
+    int currentSkillID=-1;
+    int numTotalSkills=-1;
     Json::Value wholeSequence;
     string notice="";
 

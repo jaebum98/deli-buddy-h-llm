@@ -80,9 +80,9 @@ taskManager::taskManager(ros::NodeHandle* nodehandle):nh_(*nodehandle)
         std_msgs::String speakermp3;
         speakermp3.data = "serverdisconnect";
         mapPublishers["speaker_pub"]->publish(speakermp3); 
-        system("rosnode kill pandemic_task_manager_ros_node");
+        system("rosnode kill task_manager_llm_node");
         sleep(0.5);
-        system("rosrun pandemic_task_manager_ros pandemic_task_manager_ros_node");
+        system("rosrun task_manager_llm task_manager_llm_node");
     };
 
     // initialize ros network handlers
@@ -161,9 +161,9 @@ void taskManager::initializeSubscribers()
     deliver_status_sub = nh_.subscribe("/deliver_check", 1 ,&taskManager::deliveryStatusCallback, this);
 }
 void taskManager::initializeServiceClients(){
-    vision_client = nh_.serviceClient<pandemic_task_manager_ros::taskmanager_srv>("/vision_service");
-    cona_client = nh_.serviceClient<pandemic_task_manager_ros::taskmanager_srv>("/cona_service");
-    nuc_client = nh_.serviceClient<pandemic_task_manager_ros::taskmanager_srv>("/nuc_service");
+    vision_client = nh_.serviceClient<task_manager_llm::taskmanager_srv>("/vision_service");
+    cona_client = nh_.serviceClient<task_manager_llm::taskmanager_srv>("/cona_service");
+    nuc_client = nh_.serviceClient<task_manager_llm::taskmanager_srv>("/nuc_service");
 }
 
 void taskManager::NucClientservice(string nodename){
@@ -171,7 +171,7 @@ void taskManager::NucClientservice(string nodename){
     if (!nuc_client.waitForExistence(ros::Duration(5.0))) {
         cout << "상태 확인 서비스를 찾을 수 없습니다." << endl;
     }
-    pandemic_task_manager_ros::taskmanager_srv srv;
+    task_manager_llm::taskmanager_srv srv;
     srv.request.request = nodename;
 
     if (nuc_client.call(srv)) {
@@ -200,7 +200,7 @@ void taskManager::ConaClientservice(std::string nodename){
     if (!cona_client.waitForExistence(ros::Duration(5.0))) {
         cout << "상태 확인 서비스를 찾을 수 없습니다." << endl;
     }
-    pandemic_task_manager_ros::taskmanager_srv srv;
+    task_manager_llm::taskmanager_srv srv;
     if (nodename == "driving"){
         srv.request.request = "checkError-Odom";
     }
@@ -362,14 +362,12 @@ void taskManager::armStatusCallback(const std_msgs::Int32::ConstPtr& msg)
         jointArr[i] = arm1axisArr[i];
     }
 
-    // (When mani starts) set tray number using for the deliver in this subtask  
-    if((msg->data==1 && recentArmStatus==2) && vectorTask.size()!=0) // 우선 manipulate에 회전하는거까지 들어 있으므로 1로 하기
+    // (When mani starts) set tray number using for the deliver in this skill 
+    if((msg->data==1 && recentArmStatus==2) && vectorSkill.size()!=0) // 우선 manipulate에 회전하는거까지 들어 있으므로 1로 하기
     {   
-        if(getSkillName() == "MANIPULATE") {
-            currentStatus.setTrayUsing(((subtask_MANIPULATE*)(vectorTask[currentTask]->subtask[vectorTask[currentTask]->stage]))->trayID);
+        if(getSkillName() == "Manipulate") {
+            currentStatus.setTrayUsing(((skill_Manipulate*)vectorSkill[currentSkill])->trayID);
         }
-        // cout << "tray number : " << ((subtask_MANIPULATE*)(vectorTask[currentTask]->subtask[vectorTask[currentTask]->stage]))->trayID << endl;
-        
     }
 	
     // (When mani goes finish)  data is 2 when arm starts to reset
@@ -432,7 +430,7 @@ void taskManager::armStatusCallback(const std_msgs::Int32::ConstPtr& msg)
     
 }
 
-void taskManager::leftPoseCallback(const pandemic_task_manager_ros::PlaneEstimation::ConstPtr& msg)
+void taskManager::leftPoseCallback(const task_manager_llm::PlaneEstimation::ConstPtr& msg)
 {
     cout << "leftPoseCallback() callback" << endl;
 
@@ -493,7 +491,7 @@ void taskManager::leftPoseCallback(const pandemic_task_manager_ros::PlaneEstimat
 }
 
 
-void taskManager::rightPoseCallback(const pandemic_task_manager_ros::PlaneEstimation::ConstPtr& msg)
+void taskManager::rightPoseCallback(const task_manager_llm::PlaneEstimation::ConstPtr& msg)
 {
 
     cout << "rightPoseCallback() callback" << endl;
@@ -549,7 +547,7 @@ void taskManager::rightPoseCallback(const pandemic_task_manager_ros::PlaneEstima
     currentStatus.setSkillInfo(vectorSkill[currentSkill]->getSkillName(), currentSkill);
 }
 
-void taskManager::armInfoCallback(const pandemic_task_manager_ros::robot_data::ConstPtr& msg)
+void taskManager::armInfoCallback(const task_manager_llm::robot_data::ConstPtr& msg)
 {
     if(emergencyFlag == true){
         return;
@@ -589,15 +587,14 @@ int taskManager::callSkillCallback(Json::Value s)
         // cout << "no Job assigned... waiting.." << endl; // 나중에 풀기
         return -1;
     }
-    if (currentSkill>=vectorSkill.size()) { // usually something wrong, clear the vectorTask and end 
+    if (currentSkill>=vectorSkill.size()) { // usually something wrong, clear the vectorSkill and end 
         clearSkills();
     }
 
     // call skill callback
-    int skillStatus = vectorSkill[currentSkill]->callback_Skill(s); // step forward to next subtask
+    int skillStatus = vectorSkill[currentSkill]->callback_skill(s); // step forward to next subtask
 
-    if(skillStatus==0 && vectorSkill.size()==currentSkill+1){ // when last task finished, size of vectorTask goes 0
-        vectorSkill[currentSkill]->endTask();   
+    if(skillStatus==0 && vectorSkill.size()==currentSkill+1){ // when last task finished, size of vectorSkill goes 0
         clearSkills();  
 
         cout << "Task Done" << endl;
@@ -763,28 +760,29 @@ int taskManager::onMessageJobSequence(Json::Value &rMessage)
     // Task 추가
     for (int ii=0; ii<rMessage["js"].size(); ii++) {
         infojs = rMessage["js"][ii];    
-        switch (infojs["skill"].asString()){
-            case "MoveTo":
-                locFromjs = to_string(rMessage["js"][ii]["location"]);
-                // 찾은 value값을 원래 rMessage의 skill에 추가하기 // ex. locationStr : Place 01
-                infojs["locationStr"] = locationCorres.at(locFromjs);
-                break;
-            case "PrepareLoad":
-                infojs["sourcefloor"]  = to_string(rMessage["js"]["floor"].asInt()); 
-                break;
-            case "DecideLoad":
-                break;
-            case "SwitchFloor":
-                targetFloor = to_string(rMessage["js"]["floor"].asInt()); 
-                infojs["targetfloor"]  = to_string(rMessage["js"]["floor"].asInt()); 
-                infojs["switchMap"] = mapNumCor.at(targetFloor);
-                break;
-            case "Detect":
-                break;
-            case "Manipulate":
-                infojs["tray"]  = to_string(rMessage["js"][ii]["tray"].asInt()); 
-                break;
+        if (infojs["skill"].asString() == "MoveTo"){
+            locFromjs = infojs["location"].asString();
+            // 찾은 value값을 원래 rMessage의 skill에 추가하기 // ex. locationStr : Place 01
+            infojs["locationStr"] = locationCorres.at(locFromjs);
         }
+        else if (infojs["skill"].asString() == "PrepareLoad"){
+            infojs["sourcefloor"]  = to_string(rMessage["js"]["floor"].asInt()); 
+        }
+        else if (infojs["skill"].asString() == "DecideLoad"){
+            
+        }
+        else if (infojs["skill"].asString() == "SwitchFloor"){
+            targetFloor = to_string(rMessage["js"]["floor"].asInt()); 
+            infojs["targetfloor"]  = to_string(rMessage["js"]["floor"].asInt()); 
+            infojs["switchMap"] = mapNumCor.at(targetFloor);
+        }
+        else if (infojs["skill"].asString() == "Detect"){
+            
+        }
+        else if (infojs["skill"].asString() == "Manipulate"){
+            infojs["tray"]  = to_string(rMessage["js"][ii]["tray"].asInt()); 
+        }   
+
         if(addSkill(infojs) == 1){
             cout << "Duplciated tray requested. Cleared Tasks" << endl;
             std_msgs::String speakermp3;
@@ -874,7 +872,7 @@ int taskManager::onMessageRequestRosCmd(Json::Value &rMessage)
 int taskManager::onMessageRequestEmergency(TCPSocket* tcpSocket)
 {
     cout << "Emergency Request received.. " << endl;
-    // if (vectorTask.size()==0) {
+    // if (vectorSkill.size()==0) {
     //     cout << "   no job assigned.." << endl;
     //     return -1;
     // }
@@ -930,7 +928,7 @@ int taskManager::onMessageResponseRePrepareLoad(TCPSocket* tcpSocket)
 
 int taskManager::onMessageResponseSwitchFloor(TCPSocket* tcpSocket)
 {
-    currentStatus.setfloorID(stoi(((subtask_SWITCH*)(vectorTask[currentTask]->subtask[vectorTask[currentTask]->stage]))->targetFloor));
+    currentStatus.setfloorID(stoi(((skill_SwitchFloor*)(vectorSkill[currentSkill]))->targetFloor));
 
     Json::Value jsonData;
     jsonData["type"] = "completeSwitchFloor";
@@ -955,7 +953,7 @@ int taskManager::onMessageRequestStopWait(Json::Value &rMessage)
     Json::StreamWriterBuilder writer;
     std::string jsonstring;
 
-    if (vectorTask.size()==0) {
+    if (vectorSkill.size()==0) {
         cout << "   no job assigned.." << endl;
         return -1;
     }
@@ -1067,7 +1065,7 @@ int taskManager::onMessageRequestReboot(Json::Value &rMessage)
 
 int taskManager::onMessageManualNextSkill(Json::Value &rMessage)
 {
-    vectorSkill[currentTask]->invoke_skill();
+    vectorSkill[currentSkill]->invoke_skill();
     currentSkill++;
     currentStatus.setSkillInfo(vectorSkill[currentSkill]->getSkillName(), currentSkill);
 }
@@ -1285,7 +1283,7 @@ int taskManager::addSkill_MoveTo(Json::Value params, taskManager* pt){
     cout << "location = " << locationID << ", Place = "  << locationSTR << endl;
 
     skill_MoveTo* skill = new skill_MoveTo;
-    skill->set_skill(params,&pt->nh_,pt->mapPublishers);// setting skill parameter
+    skill->set_skill(params,pt->mapPublishers);// setting skill parameter
     pt->vectorSkill.push_back(skill);
 }
 
@@ -1303,19 +1301,19 @@ int taskManager::addSkill_Manipulate(Json::Value params, taskManager* pt){
     int trayID = params["tray"].asInt();
 
     cout << "trayID = " << trayID << endl;
-    {
-        taskListDelivery.push_back(trayID);
-        auto result = unique_trayID.insert(trayID);
-        if (!result.second) { //already trayID is used
-            cout << "error in addSkill, trayID " << trayID << " is already used in the task list." << endl;
-            return 1;
-        }
-        else {
-            skill_Manipulate* skill = new skill_Manipulate;
-            skill->set_skill(params,&pt->nh_,pt->mapPublishers);//, &pt->pub_left, &pt->pub_right, &pt->conaGo_pub);
-            pt->vectorSkill.push_back(skill);
-        }
+    
+    taskListDelivery.push_back(trayID);
+    auto result = unique_trayID.insert(trayID);
+    if (!result.second) { //already trayID is used
+        cout << "error in addSkill, trayID " << trayID << " is already used in the task list." << endl;
+        return 1;
     }
+    else {
+        skill_Manipulate* skill = new skill_Manipulate;
+        skill->set_skill(params,pt->mapPublishers);//, &pt->pub_left, &pt->pub_right, &pt->conaGo_pub);
+        pt->vectorSkill.push_back(skill);
+    }
+    
 }
 
 int taskManager::addSkill_SetEvEms(Json::Value params, taskManager* pt){
@@ -1325,7 +1323,7 @@ int taskManager::addSkill_SetEvEms(Json::Value params, taskManager* pt){
     cout << "location = " << locationID << ", Place = "  << locationSTR << endl;
 
     skill_SetEvEms* skill = new skill_SetEvEms;
-    skill->set_skill(params,&pt->nh_,pt->mapPublishers);// setting skill parameter
+    skill->set_skill(params,pt->mapPublishers);// setting skill parameter
     pt->vectorSkill.push_back(skill);
 }
 
@@ -1334,7 +1332,7 @@ int taskManager::addSkill_SetEvEms(Json::Value params, taskManager* pt){
 int taskManager::addSkill_PrepareLoad(Json::Value params, taskManager* pt){
     cout << "Source Floor = " << params["sourceFloor"].asInt() << endl;
     skill_PrepareLoad* skill = new skill_PrepareLoad;
-    skill->set_skill(params,&pt->nh_,pt->mapPublishers, pt->tcpSocket);
+    skill->set_skill(params,pt->mapPublishers, pt->tcpSocket);
     pt->vectorSkill.push_back(skill);
 }
 
@@ -1342,7 +1340,7 @@ int taskManager::addSkill_DecideLoad(Json::Value params, taskManager* pt){
     
     cout << "Decide Load" << endl;
     skill_DecideLoad* skill = new skill_DecideLoad;
-    skill->set_skill(params,&pt->nh_,pt->mapPublishers, pt->tcpSocket);
+    skill->set_skill(params,pt->mapPublishers, pt->tcpSocket);
     pt->vectorSkill.push_back(skill);
 }
 
@@ -1350,6 +1348,6 @@ int taskManager::addSkill_SwitchFloor(Json::Value params, taskManager* pt){
     
     cout << "Target Floor = "  << params["targetFloor"].asInt() << endl;
     skill_SwitchFloor* skill = new skill_SwitchFloor;
-    skill->set_skill(params,&pt->nh_,pt->mapPublishers, pt->tcpSocket);
+    skill->set_skill(params,pt->mapPublishers, pt->tcpSocket);
     pt->vectorSkill.push_back(skill);
 }
