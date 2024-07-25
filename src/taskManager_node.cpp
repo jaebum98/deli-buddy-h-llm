@@ -61,7 +61,7 @@ int main(int argc, char **argv)
     ros::NodeHandle nh;
     ros::Publisher chatter_pub = nh.advertise<std_msgs::String>("rosTaskManager", 1000);
     ros::Rate loop_rate(10);
-
+    
     taskManager tf(&nh);
     tf.loadConfig("/home/vision/catkin_ws/src/pandemic_task_manager_ros/src/config.json");
     //tf.setRobotName("pandemic101");

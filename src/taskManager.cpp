@@ -753,17 +753,13 @@ int taskManager::sendTaskSeqToServer()
 int taskManager::onMessageJobSequence(Json::Value &rMessage)
 {
     cout << endl << "jobsequence received.. calling path planner" << endl;
-    // parsing job sequence.. need to revise
-    // cout << rMessage << endl;
     cout << "Setting task sequence" << endl;
 
     std:string locFromjs;
     Json::Value infojs; 
 
     std::string sourceFloor, targetFloor;
-    std::string sourceFloor_inFrontEV, targetFloor_unload;
-    std::string sourceFloor_evInside, targetFloor_evInside;
-    Json::Value::Members keys = jsonData.getMemberNames();
+
     // Task 추가
     for (int ii=0; ii<rMessage["js"].size(); ii++) {
         infojs = rMessage["js"][ii];    
@@ -804,8 +800,6 @@ int taskManager::onMessageJobSequence(Json::Value &rMessage)
     cout << endl << endl;
 
     Json::Value jsonWholeSkill;
-    Json::Value jsonTask;
-    Json::Value jsonSubtask;
 
     for (int ii=0; ii<vectorSkill.size(); ii++) {
         // Skill 목록 출력

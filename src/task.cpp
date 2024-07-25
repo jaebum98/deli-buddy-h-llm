@@ -20,7 +20,7 @@ int skill_MoveTo::invoke_skill(){
     sleep(1);
     std_msgs::String speakermp3;
     speakermp3.data = "moveto_place";
-    mPublishers["speaker_pub"]->publish(speakermp3); 
+    mPublishers["speaker_pub"]->publish(speakermp3);
     std_msgs::String rosGoMsg;
     std::stringstream ssGo;
     ssGo << "goTo " << locationStr;
