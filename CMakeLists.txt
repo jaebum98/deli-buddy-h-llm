@@ -3,7 +3,7 @@ project(task_manager_llm)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 add_compile_options(-std=c++11)
-
+#1
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
@@ -13,7 +13,6 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   message_generation
 )
-
 find_library(jsoncpp_LIB NAMES jsoncpp PATHS /usr/lib/aarch64-linux-gnu NO_DEFAULT_PATH)
 
 ## System dependencies are found with CMake's conventions
