@@ -251,21 +251,21 @@ int robotStatus::writeRobotStatus(Json::Value &nStatus)
     for(int i=0; i<sizeof(arm1axis)/sizeof(arm1axis[0]); i++){
         arm1axis_json.append(arm1axis[i]);
     }
-    // for(int i=0; i<sizeof(arm2axis)/sizeof(arm2axis[0]); i++){
-    //     arm2axis_json.append(arm2axis[i]);
-    // }
-    // for(int i=0; i<sizeof(arm_front_pos)/sizeof(arm_front_pos[0]); i++){
-    //     arm_front_pos_json.append(arm_front_pos[i]);
-    // }
+    for(int i=0; i<sizeof(arm2axis)/sizeof(arm2axis[0]); i++){
+        arm2axis_json.append(arm2axis[i]);
+    }
+    for(int i=0; i<sizeof(arm_front_pos)/sizeof(arm_front_pos[0]); i++){
+        arm_front_pos_json.append(arm_front_pos[i]);
+    }
     // for(int i=0; i<sizeof(arm_tray_status)/sizeof(arm_tray_status[0]); i++){
     //     arm_tray_status_json.append(arm_tray_status[i]);
     // }
 
     nStatus["ars"] = arm_robot_state;
     nStatus["a1x"] = arm1axis_json;
-    // nStatus["a2x"] = arm2axis_json;
+    nStatus["a2x"] = arm2axis_json;
     nStatus["a1h"] = arm_1height;
-    // nStatus["a2h"] = arm_2height;
+    nStatus["a2h"] = arm_2height;
     nStatus["aty"] = arm_tray;
     nStatus["afp"] = arm_front_pos_json;
     nStatus["ats"] = (int)trayStatusBit.to_ulong();

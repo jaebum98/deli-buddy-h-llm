@@ -593,7 +593,7 @@ int taskManager::callSkillCallback(Json::Value s)
         currentStatus.setNotice("Task Done");    
         if (netstatus) // when network is alive,
         {
-            sendTaskSeqToServer();
+            sendSkillSeqToServer();
         }
                      
         return -1;
@@ -777,14 +777,15 @@ int taskManager::onMessageJobSequence(Json::Value &rMessage)
             infojs["locationStr"] = locationCorres.at(locFromjs);
         }
         else if (infojs["skill"].asString() == "PrepareLoad"){
-            infojs["sourcefloor"]  = to_string(rMessage["js"][ii]["floor"].asInt()); 
+            cout << rMessage["js"][ii]["floor"] << endl;
+            infojs["sourceFloor"]  = rMessage["js"][ii]["floor"].asInt(); 
         }
         else if (infojs["skill"].asString() == "DecideLoad"){
             
         }
         else if (infojs["skill"].asString() == "SwitchFloor"){
             targetFloor = to_string(rMessage["js"][ii]["floor"].asInt()); 
-            infojs["targetfloor"]  = to_string(rMessage["js"][ii]["floor"].asInt()); 
+            infojs["targetFloor"]  = rMessage["js"][ii]["floor"].asInt(); 
             infojs["switchMap"] = mapNumCor.at(targetFloor);
         }
         else if (infojs["skill"].asString() == "Detect"){
@@ -792,7 +793,6 @@ int taskManager::onMessageJobSequence(Json::Value &rMessage)
         }
         else if (infojs["skill"].asString() == "Manipulate"){
             infojs["tray"]  = to_string(rMessage["js"][ii]["tray"].asInt()); 
-            cout << infojs["tray"] << endl;
         }   
 
         if(addSkill(infojs) == 1){
@@ -1313,7 +1313,6 @@ int taskManager::addSkill_Detect(Json::Value params, taskManager* pt){
 
 int taskManager::addSkill_Manipulate(Json::Value params, taskManager* pt){
     int trayID = stoi(params["tray"].asString());
-    cout << "trayID = " << trayID << endl;
     
     pt->taskListDelivery.push_back(trayID);
     auto result = pt->unique_trayID.insert(trayID);
