@@ -26,7 +26,6 @@
                 {"8223" : "Place 04"}, 
                 {"2floorev_front" : "Place 05"}, // in front of EV
                 {"2floorev_in" : "Place 06"}, // EV inside
-                // {"2002" : "Place 07"}  // in front of EV (unload finish location)
 
                 {"8323" : "Place 01"}, // 3rd floor
                 {"8304" : "Place 02"}, 
@@ -34,24 +33,7 @@
                 {"8324" : "Place 04"}, 
                 {"3floorev_front" : "Place 06"}, // in front of EV
                 {"3floorev_in" : "Place 07"}, // EV inside
-                {"8300" : "Place 05"}, //home
-                // {"3002" : "Place 07"}, // in front of EV (unload finish location)
-
-                {"8410" : "Place 01"},
-                {"8411" : "Place 02"},
-                {"8400" : "Place 03"}
-
-                // {"3220" : "Place 05"}, // 2
-                // {"3100" : "Place 06"}, // 6
-                // {"3600" : "Place 07"}, // 7
-                // {"3231" : "Place 08"}, // 1
-                // {"3232" : "Place 09"}, 
-                // {"3210" : "Place 10"}, // 3
-                // {"3230" : "Place 11"}, //HOME // 9
-                // {"3000" : "Place 12"},  // EV  // 10
-                // {"3001" : "Place 13"}  // EV load location
-
-
+                {"8300" : "Place 05"} //home
             ],
     "start" : "8300", // 평소엔 home과 동일
     "home" : "8300", // 전시회용 : 8400

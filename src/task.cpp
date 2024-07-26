@@ -137,7 +137,7 @@ int skill_Detect::callback_skill(Json::Value js){
 
 int skill_Manipulate::set_skill(Json::Value js, map<string,ros::Publisher*> mPubs){
     skillBase::set_skill(js, mPubs);    
-    trayID = js["tray"].asInt();
+    trayID = stoi(js["tray"].asString());
 }
 
 int skill_Manipulate::invoke_skill(){

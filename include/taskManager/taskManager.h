@@ -92,7 +92,6 @@ public:
     void naviStatusCallback(const std_msgs::String::ConstPtr& msg);
     void leftPoseCallback(const task_manager_llm::PlaneEstimation::ConstPtr& msg);
     void rightPoseCallback(const task_manager_llm::PlaneEstimation::ConstPtr& msg);
-    void cmdMappingNavi(const std_msgs::String::ConstPtr& msg);
     void armStatusCallback(const std_msgs::Int32::ConstPtr& msg);
     void deliverCheckCallback(const std_msgs::String::ConstPtr& msg);
     void absolPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
@@ -165,7 +164,7 @@ public:
     ros::ServiceClient vision_client, cona_client, nuc_client;
 
     map<string,ros::Publisher*> mapPublishers;
-    std::vector<int> taskListDelivery; // tray 중복확인
+    std::vector<int> taskListDelivery; // taskmanager 클래스의 인스턴스의 멤버변수
     std::unordered_set<int> unique_trayID;
     vector<pair<int,int>> orderedTask; // after ordering the task.. 
 

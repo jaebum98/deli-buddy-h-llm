@@ -235,7 +235,6 @@ int robotStatus::writeRobotStatus(Json::Value &nStatus)
     nStatus["cs"] = currentSkill;
     nStatus["csid"] = currentSkillID;
 
-
     // notice
     if(currentSkillID >= 0){
         nStatus["nt"] = "Task Start";

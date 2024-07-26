@@ -8,7 +8,6 @@
 // 서버주소 전역변수
 std::string serverAddress;
 uint16_t serverPort;
-uint16_t serverPortev;
 
 taskManager::taskManager(ros::NodeHandle* nodehandle):nh_(*nodehandle)
 {
@@ -144,10 +143,7 @@ void taskManager::initializeTimer() // timer변수를 taskmanager 멤버변수�
 
 void taskManager::initializeSubscribers()
 {
-  //  cmd_operation_sub = nh_.subscribe("/cmdMappingNavi", 1, &ServiceOperation::cmdMappingNavi, this);
     navi_status_sub = nh_.subscribe("/navistatus", 5, &taskManager::naviStatusCallback, this);
-    cmd_operation_sub = nh_.subscribe("/cmdMappingNavi", 1, &taskManager::cmdMappingNavi, this);
-   // navi_status_sub = nh_.subscribe("/navistatus", 1, &ServiceOperation::naviStatusCallback, this);
     left_pose_sub = nh_.subscribe("/service_vision/camera_left/camera_left/plane_estimation", 1, &taskManager::leftPoseCallback, this);
     right_pose_sub = nh_.subscribe("/service_vision/camera_right/camera_right/plane_estimation", 1, &taskManager::rightPoseCallback, this);
     arm_status_sub = nh_.subscribe("/arm_status", 10, &taskManager::armStatusCallback, this);
@@ -155,7 +151,6 @@ void taskManager::initializeSubscribers()
     abs_pose_sub = nh_.subscribe("/cona/absol_pose", 1, &taskManager::absolPoseCallback, this);
     manual_command_sub = nh_.subscribe("/manualCmd", 1, &taskManager::manualCommandCallback, this);
     arm_info_sub = nh_.subscribe("/arm_info", 1, &taskManager::armInfoCallback, this);
-    // ev_load_status_sub = nh_.subscribe("/output_Mode", 10, &taskManager::evLoadStatusCallback, this);
     dock_check_sub = nh_.subscribe("/e_dock/check_result", 1 ,&taskManager::edockresultCallback, this);
     camera_status_sub = nh_.subscribe("/service_vision/camera_status", 1, &taskManager::cameraStatusCallback, this);
     deliver_status_sub = nh_.subscribe("/deliver_check", 1 ,&taskManager::deliveryStatusCallback, this);
@@ -365,7 +360,7 @@ void taskManager::armStatusCallback(const std_msgs::Int32::ConstPtr& msg)
     // (When mani starts) set tray number using for the deliver in this skill 
     if((msg->data==1 && recentArmStatus==2) && vectorSkill.size()!=0) // 우선 manipulate에 회전하는거까지 들어 있으므로 1로 하기
     {   
-        if(getSkillName() == "Manipulate") {
+        if(vectorSkill[currentSkill]->getSkillName() == "Manipulate") {
             currentStatus.setTrayUsing(((skill_Manipulate*)vectorSkill[currentSkill])->trayID);
         }
     }
@@ -389,7 +384,7 @@ void taskManager::armStatusCallback(const std_msgs::Int32::ConstPtr& msg)
 
         maniCheck = false;
 
-        if (getSkillName() == "RESET_ARM_POSE"){
+        if (vectorSkill[currentSkill]->getSkillName() == "RESET_ARM_POSE"){
 	        jsonData["type"] = "ResetArm";
         }
         else jsonData["type"] = "manipulate";
@@ -403,10 +398,6 @@ void taskManager::armStatusCallback(const std_msgs::Int32::ConstPtr& msg)
             return;
         }
         currentStatus.setSkillInfo(vectorSkill[currentSkill]->getSkillName(), currentSkill);     
-        // if (netstatus) // when network is alive,
-            // sendStatusToServer();      
-                
-
         currentStatus.setTrayUsing(-1); // reset number of tray using.
 	}
     
@@ -420,8 +411,6 @@ void taskManager::armStatusCallback(const std_msgs::Int32::ConstPtr& msg)
         // cout << "check" << previous_cona_time << " and " << current_cona_time << endl;
         if (current_cona_time == previous_cona_time){
             ROS_WARN("cona PC was died!!!!");
-            // if (netstatus) // when network is alive,
-            //     sendStatusToServer();   // cona가 죽으면 여기서 sendstatus보내줌
         }
         last_check_time = ros::Time::now();
         previous_cona_time = current_cona_time;
@@ -485,9 +474,6 @@ void taskManager::leftPoseCallback(const task_manager_llm::PlaneEstimation::Cons
         return;
     }
     currentStatus.setSkillInfo(vectorSkill[currentSkill]->getSkillName(), currentSkill);
-    
-    // if (netstatus) // when network is alive,
-    //     sendStatusToServer();
 }
 
 
@@ -572,11 +558,12 @@ void taskManager::armInfoCallback(const task_manager_llm::robot_data::ConstPtr& 
 int taskManager::clearSkills()
 {    
     vectorSkill.clear(); 
-
+    taskListDelivery.clear(); 
+    unique_trayID.clear();
     Json::Value noneSkill;
     currentStatus.setWholeSequence(noneSkill);
 
-    currentSkill = 0;   
+    currentSkill = -1;   
 
     emergencyFlag = false;
 }
@@ -715,7 +702,31 @@ void taskManager::sendStatusToServerCallback(const ros::TimerEvent&)
 
 void taskManager::ServerConnectCallback(const ros::TimerEvent&)
 {
-    connectToServer(serverAddress, serverPort);
+    int ret = 0;
+    tcpSocket->Connect(
+        serverAddress, serverPort, [&]
+        {
+            cout << "connect 443" << endl;
+            std_msgs::String speakermp3;
+            speakermp3.data = "serverconnect";
+            mapPublishers["speaker_pub"]->publish(speakermp3); 
+            onSendConnect(tcpSocket);
+            ret = 0;
+            netstatus = 1;
+            serverconnect_timer.stop();
+            send_status_timer.start();
+        },
+        [&](int errorCode, std::string errorMessage)
+        {
+            // CONNECTION FAILED
+            cout << errorCode << " : " << errorMessage << endl;
+            ret = 1;
+
+            netstatus = 0;
+        });    
+    usleep(100000); //try 0.1s
+    // return ret;
+    // connectToServer(serverAddress, serverPort);
 }
 
 int taskManager::sendStatusToServer()
@@ -759,21 +770,21 @@ int taskManager::onMessageJobSequence(Json::Value &rMessage)
 
     // Task 추가
     for (int ii=0; ii<rMessage["js"].size(); ii++) {
-        infojs = rMessage["js"][ii];    
+        infojs = rMessage["js"][ii];
         if (infojs["skill"].asString() == "MoveTo"){
             locFromjs = infojs["location"].asString();
             // 찾은 value값을 원래 rMessage의 skill에 추가하기 // ex. locationStr : Place 01
             infojs["locationStr"] = locationCorres.at(locFromjs);
         }
         else if (infojs["skill"].asString() == "PrepareLoad"){
-            infojs["sourcefloor"]  = to_string(rMessage["js"]["floor"].asInt()); 
+            infojs["sourcefloor"]  = to_string(rMessage["js"][ii]["floor"].asInt()); 
         }
         else if (infojs["skill"].asString() == "DecideLoad"){
             
         }
         else if (infojs["skill"].asString() == "SwitchFloor"){
-            targetFloor = to_string(rMessage["js"]["floor"].asInt()); 
-            infojs["targetfloor"]  = to_string(rMessage["js"]["floor"].asInt()); 
+            targetFloor = to_string(rMessage["js"][ii]["floor"].asInt()); 
+            infojs["targetfloor"]  = to_string(rMessage["js"][ii]["floor"].asInt()); 
             infojs["switchMap"] = mapNumCor.at(targetFloor);
         }
         else if (infojs["skill"].asString() == "Detect"){
@@ -781,6 +792,7 @@ int taskManager::onMessageJobSequence(Json::Value &rMessage)
         }
         else if (infojs["skill"].asString() == "Manipulate"){
             infojs["tray"]  = to_string(rMessage["js"][ii]["tray"].asInt()); 
+            cout << infojs["tray"] << endl;
         }   
 
         if(addSkill(infojs) == 1){
@@ -810,7 +822,7 @@ int taskManager::onMessageJobSequence(Json::Value &rMessage)
     sendTaskSeqToServer(); // 서버로 job sequence 전송
     
     // Task 실행 준비
-    currentSkill = 0;
+    currentSkill = -1;
 
     cout << endl;
 
@@ -832,7 +844,7 @@ int taskManager::onMessageRequestStart(TCPSocket* tcpSocket)
     std_msgs::String speakermp3;
     speakermp3.data = "TaskStart";
     mapPublishers["speaker_pub"]->publish(speakermp3); 
-    
+    currentSkill = 0; // task 시작
     vectorSkill[currentSkill]->invoke_skill();    
     cout << "currentSkill = " << vectorSkill[currentSkill]->getSkillName() << endl;
     cout << "currentSkillID = " << currentSkill << endl;
@@ -847,10 +859,13 @@ int taskManager::onMessageRequestTaskClear(TCPSocket* tcpSocket)
 {
     cout << "Request for clearing all tasks received.. " << endl;
     if(vectorSkill.size() > 0){
+        cout << vectorSkill.size() << endl;
         clearSkills();
-        initializeLoadmap(); //
+        
+        initializeLoadmap(); 
         currentStatus.setSkillInfo("", currentSkill); 
         currentStatus.setNotice("Task not assigned");
+        cout << vectorSkill.size() << endl;
         currentStatus.setHoldStatus("off");
         if (netstatus) // when network is alive,
             sendTaskSeqToServer();
@@ -957,7 +972,7 @@ int taskManager::onMessageRequestStopWait(Json::Value &rMessage)
         cout << "   no job assigned.." << endl;
         return -1;
     }
-    else if(getSkillName().compare("MOVETO") == 0 || getSkillName().compare("MOVETOEV") == 0){ 
+    else if(vectorSkill[currentSkill]->getSkillName() == "MOVETO"){ 
         std_msgs::String rosGoMsg;
         rosGoMsg.data = rMessage["sg"].asString();     // stop, go가 들어가있는 key
         mapPublishers["conaGo_pub"]->publish(rosGoMsg);  // "/cona/cmd" 토픽으로 subtask 보내줌(모든 subtask동일)
@@ -1081,7 +1096,6 @@ int taskManager::loadConfig(string filename) {
   std::string mapName = root["MapName"].asString();
   serverAddress = root["server"].asString();
   serverPort = root["port"].asUInt();
-  serverPortev = root["port2"].asUInt();
   std::string robotID = root["robotID"].asString();
   Json::Value mapCor = root["mapLoad"];
   Json::Value locCor = root["locationCorresponence"];
@@ -1093,7 +1107,7 @@ int taskManager::loadConfig(string filename) {
 
   cout << "int taskManager::loadConfig(string filename)" << endl << "===========================" << endl;
   cout << "RobotName = " << name << endl;
-  cout << "serverAddress = " << serverAddress << ", port = " << serverPort << ", port2 = " << serverPortev << endl;
+  cout << "serverAddress = " << serverAddress << ", port = " << serverPort << endl;
   cout << "mapName = " << mapName << endl;
   cout << "Home = " << homeLoc << endl;
   cout << "Start = " << startLoc << endl;
@@ -1277,7 +1291,7 @@ int taskManager::addSkill(Json::Value nSkill)
 }
 
 int taskManager::addSkill_MoveTo(Json::Value params, taskManager* pt){
-    int locationID = params["location"].asInt();
+    std::string locationID = params["location"].asString();
     std::string locationSTR = params["locationStr"].asString();
 
     cout << "location = " << locationID << ", Place = "  << locationSTR << endl;
@@ -1298,12 +1312,11 @@ int taskManager::addSkill_Detect(Json::Value params, taskManager* pt){
 }
 
 int taskManager::addSkill_Manipulate(Json::Value params, taskManager* pt){
-    int trayID = params["tray"].asInt();
-
+    int trayID = stoi(params["tray"].asString());
     cout << "trayID = " << trayID << endl;
     
-    taskListDelivery.push_back(trayID);
-    auto result = unique_trayID.insert(trayID);
+    pt->taskListDelivery.push_back(trayID);
+    auto result = pt->unique_trayID.insert(trayID);
     if (!result.second) { //already trayID is used
         cout << "error in addSkill, trayID " << trayID << " is already used in the task list." << endl;
         return 1;
@@ -1316,8 +1329,8 @@ int taskManager::addSkill_Manipulate(Json::Value params, taskManager* pt){
     
 }
 
-int taskManager::addSkill_SetEvEms(Json::Value params, taskManager* pt){
-    int locationID = params["location"].asInt();
+int taskManager::addSkill_SetEvEms(Json::Value params, taskManager* pt){ //pt : taskmanager 클래스의 인스턴스에 대한 포인터
+    std::string locationID = params["location"].asString();;
     std::string locationSTR = params["locationStr"].asString();
 
     cout << "location = " << locationID << ", Place = "  << locationSTR << endl;
