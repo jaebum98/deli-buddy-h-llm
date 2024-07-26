@@ -52,7 +52,7 @@ public:
     int writeRobotStatus(Json::Value &nStatus);
     
     int setWholeSequence(Json::Value eachTask);
-    int writeTaskSequence(Json::Value &taskSeq);
+    int writeSkillSequence(Json::Value &skillSeq);
 
     int writeRobotinitdata(Json::Value &InitData); //tray info
 

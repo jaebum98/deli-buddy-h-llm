@@ -52,7 +52,7 @@ taskManager::taskManager(ros::NodeHandle* nodehandle):nh_(*nodehandle)
         if      (rMessage["command"]=="jobsequence")            onMessageJobSequence(rMessage);
         else if (rMessage["command"]=="reqStart")               onMessageRequestStart(tcpSocket);  
         
-        else if (rMessage["command"]=="reqTaskClear")           onMessageRequestTaskClear(tcpSocket);
+        else if (rMessage["command"]=="reqSkillClear")          onMessageRequestSkillClear(tcpSocket);
         else if (rMessage["command"]=="reqRosCmd")              onMessageRequestRosCmd(rMessage);                
         else if (rMessage["command"]=="reqEm")                  onMessageRequestEmergency(tcpSocket); 
         else if (rMessage["command"]=="reqStopWait")            onMessageRequestStopWait(rMessage); 
@@ -743,13 +743,13 @@ int taskManager::sendStatusToServer()
     tcpSocket->SendJson(jsonstring);
 }
 
-int taskManager::sendTaskSeqToServer()
+int taskManager::sendSkillSeqToServer()
 {
     Json::Value sendbuffer;
-    currentStatus.writeTaskSequence(sendbuffer);
+    currentStatus.writeSkillSequence(sendbuffer);
     
     Json::Value jsonData;
-    jsonData["type"] = "TASKSEQ";
+    jsonData["type"] = "SKILLSEQ";
     jsonData["content"] = sendbuffer;
     Json::StreamWriterBuilder writer;
     
@@ -796,7 +796,7 @@ int taskManager::onMessageJobSequence(Json::Value &rMessage)
         }   
 
         if(addSkill(infojs) == 1){
-            cout << "Duplciated tray requested. Cleared Tasks" << endl;
+            cout << "Duplciated tray requested. Cleared Skills" << endl;
             std_msgs::String speakermp3;
             speakermp3.data = "tasknotAssigned";
             mapPublishers["speaker_pub"]->publish(speakermp3); 
@@ -819,14 +819,14 @@ int taskManager::onMessageJobSequence(Json::Value &rMessage)
     }    
     
     currentStatus.setWholeSequence(jsonWholeSkill);    
-    sendTaskSeqToServer(); // 서버로 job sequence 전송
+    sendSkillSeqToServer(); // 서버로 job sequence 전송
     
-    // Task 실행 준비
+    // Skill 실행 준비
     currentSkill = -1;
 
     cout << endl;
 
-    currentStatus.setSkillInfo("", currentSkill); // 프론트 task 목록 창 지울 때 -1 보내지만 notice가 task assigned이면 목록창 출력
+    currentStatus.setSkillInfo("", currentSkill); // 프론트 skill 목록 창 지울 때 -1 보내지만 notice가 task assigned이면 목록창 출력
     currentStatus.setNotice("Task Assigned");
     std_msgs::String speakermp3;
     speakermp3.data = "TaskAssigned";
@@ -855,9 +855,9 @@ int taskManager::onMessageRequestStart(TCPSocket* tcpSocket)
     return 0;
 }
 
-int taskManager::onMessageRequestTaskClear(TCPSocket* tcpSocket)
+int taskManager::onMessageRequestSkillClear(TCPSocket* tcpSocket)
 {
-    cout << "Request for clearing all tasks received.. " << endl;
+    cout << "Request for clearing all skills received.. " << endl;
     if(vectorSkill.size() > 0){
         cout << vectorSkill.size() << endl;
         clearSkills();
@@ -868,7 +868,7 @@ int taskManager::onMessageRequestTaskClear(TCPSocket* tcpSocket)
         cout << vectorSkill.size() << endl;
         currentStatus.setHoldStatus("off");
         if (netstatus) // when network is alive,
-            sendTaskSeqToServer();
+            sendSkillSeqToServer();
     }
 
     return 0;
@@ -891,7 +891,7 @@ int taskManager::onMessageRequestEmergency(TCPSocket* tcpSocket)
     //     cout << "   no job assigned.." << endl;
     //     return -1;
     // }
-    cout << "Emergency : Stop Whole Task.. " << endl;
+    cout << "Emergency : Stop Whole Skill.. " << endl;
 
     // ROS publish
     std_msgs::Bool emMsg;
@@ -899,7 +899,7 @@ int taskManager::onMessageRequestEmergency(TCPSocket* tcpSocket)
 
     mapPublishers["emergency_pub"] -> publish(emMsg);
 
-    // 모든 task 삭제
+    // 모든 skill 삭제
     clearSkills();    
     emergencyFlag = true;   
 
@@ -972,10 +972,10 @@ int taskManager::onMessageRequestStopWait(Json::Value &rMessage)
         cout << "   no job assigned.." << endl;
         return -1;
     }
-    else if(vectorSkill[currentSkill]->getSkillName() == "MOVETO"){ 
+    else if(vectorSkill[currentSkill]->getSkillName() == "MoveTo"){ 
         std_msgs::String rosGoMsg;
         rosGoMsg.data = rMessage["sg"].asString();     // stop, go가 들어가있는 key
-        mapPublishers["conaGo_pub"]->publish(rosGoMsg);  // "/cona/cmd" 토픽으로 subtask 보내줌(모든 subtask동일)
+        mapPublishers["conaGo_pub"]->publish(rosGoMsg);  // "/cona/cmd" 토픽으로 skill 보내줌(모든 skill동일)
         if (rMessage["sg"].asString() == "stop"){
             cout << "Requested HOLD ON" << endl;
             std_msgs::String speakermp3;

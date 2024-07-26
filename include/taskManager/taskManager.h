@@ -106,7 +106,7 @@ public:
     int onMessageJobSequence(Json::Value &rMessage);
     int onMessageRequestStatus(TCPSocket* tcpSocket);
     int onMessageRequestStart(TCPSocket* tcpSocket);
-    int onMessageRequestTaskClear(TCPSocket* tcpSocket);
+    int onMessageRequestSkillClear(TCPSocket* tcpSocket);
     int onMessageRequestRosCmd(Json::Value &rMessage);
     int onMessageRequestEmergency(TCPSocket* tcpSocket); 
     int onMessageRequestStopWait(Json::Value &rMessage);
@@ -119,10 +119,6 @@ public:
     int onMessageRequestReboot(Json::Value &rMessage);
     int onMessageManualNextSkill(Json::Value &rMessage);
 
-    //전시회 용
-    int onMessageRequestStartOffline();
-    int onMessageRequestTaskClearOffline();
-
     int callSkillCallback(Json::Value js);
     int clearSkills();
 
@@ -130,7 +126,7 @@ public:
 
     void sendStatusToServerCallback(const ros::TimerEvent&);
     int sendStatusToServer();
-    int sendTaskSeqToServer();
+    int sendSkillSeqToServer();
     int sendInitDataToServer(); // task info
 
     string getSkillName();
