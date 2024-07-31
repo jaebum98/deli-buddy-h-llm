@@ -8,8 +8,8 @@
 #include <vector>
 #include "tcpsocket.hpp"
 #include <iostream>
+#include "task.h"
 #include <unordered_set>
-
 #include <jsoncpp/json/json.h>
 #include <jsoncpp/json/writer.h>
 #include "taskManager/robotStatus.h"
@@ -90,6 +90,7 @@ public:
     void initializePublishers();
     void initializeServiceClients();
     void naviStatusCallback(const std_msgs::String::ConstPtr& msg);
+    void postboxCallback(const std_msgs::Int32::ConstPtr& msg);
     void leftPoseCallback(const task_manager_llm::PlaneEstimation::ConstPtr& msg);
     void rightPoseCallback(const task_manager_llm::PlaneEstimation::ConstPtr& msg);
     void armStatusCallback(const std_msgs::Int32::ConstPtr& msg);
@@ -110,7 +111,6 @@ public:
     int onMessageRequestRosCmd(Json::Value &rMessage);
     int onMessageRequestEmergency(TCPSocket* tcpSocket); 
     int onMessageRequestStopWait(Json::Value &rMessage);
-    int onMessageResponseRePrepareLoad(TCPSocket* tcpSocket);
     int onMessageResponsePrepareLoad(TCPSocket* tcpSocket);
     int onMessageResponseLoadManually(TCPSocket* tcpSocket); 
     int onMessageResponseSwitchFloor(TCPSocket* tcpSocket);
@@ -121,6 +121,8 @@ public:
 
     int callSkillCallback(Json::Value js);
     int clearSkills();
+    void ManualEndSkill();
+    void SkillEndCallback(const ros::TimerEvent&);
 
     int onSendConnect(TCPSocket* tcpSocket);
 
@@ -148,17 +150,16 @@ public:
     //ros::Subscriber navi_status_sub, cmd_operation_sub; 
     //ros::Publisher cmdGUI, conaGo_pub;
 
-    ros::Timer send_status_timer, serverconnect_timer;
+    ros::Timer send_status_timer, serverconnect_timer, skill_force_end_timer;
 
-    ros::Publisher cmdGUI, pub_left, pub_right, conaGo_pub;
+    ros::Publisher cmdGUI, pub_left, pub_right, conaGo_pub, pub_posebox;
     ros::Publisher  arm_pub, deliverCheck_pub, emergency_pub, ev_load_pub, map_loader,dockdt_pub, speaker_pub;
 
-    ros::Subscriber navi_status_sub, cmd_operation_sub, left_pose_sub, right_pose_sub, sub_left_plane, camera_status_sub; 
+    ros::Subscriber navi_status_sub, cmd_operation_sub, left_pose_sub, right_pose_sub, sub_left_plane, camera_status_sub, postbox_sub; 
     ros::Subscriber arm_status_sub,abs_pose_sub, deliver_check_sub, manual_command_sub, arm_info_sub, ev_load_status_sub, dock_check_sub, keyboard_input_sub;
     ros::Subscriber deliver_status_sub; //임시
 
     ros::ServiceClient vision_client, cona_client, nuc_client;
-
     map<string,ros::Publisher*> mapPublishers;
     std::vector<int> taskListDelivery; // taskmanager 클래스의 인스턴스의 멤버변수
     std::unordered_set<int> unique_trayID;

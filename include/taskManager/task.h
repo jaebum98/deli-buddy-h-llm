@@ -5,13 +5,10 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <std_msgs/Float64.h>
 // #include <taskManager/taskManager.h>
-
-
 #include <vector>
 #include <map>
 #include "tcpsocket.hpp"
 #include <iostream>
-
 #include <jsoncpp/json/json.h>
 #include <jsoncpp/json/writer.h>
 #include <task_manager_llm/PlaneEstimation.h>
@@ -33,7 +30,7 @@ enum Skills {
 class skillBase {
 
 public:
-    // taskManager taskManager;
+    // taskManager *taskManager;
 
     skillBase() {};
     ~skillBase() {};
@@ -51,7 +48,6 @@ public:
     ros::NodeHandle nh_; 
     int status =-1;
     map<string,ros::Publisher*> mPublishers;
-
 };
 
 
@@ -97,7 +93,7 @@ public:
     skill_Manipulate() {};
     ~skill_Manipulate() {};
 
-    virtual int set_skill(Json::Value js, map<string,ros::Publisher*> mPubs);
+    virtual int set_skill(Json::Value js, map<string,ros::Publisher*> mPubs, ros::Timer scall);
     virtual int invoke_skill();
     virtual int callback_skill(Json::Value js);
     virtual string getSkillName() {return "Manipulate";}
@@ -105,7 +101,7 @@ public:
     virtual void listSkill() {cout << "\t\t Manipulate  trayID = "<< trayID << endl;}
 
     void setDetectPtr(skill_Detect* ptr);
-
+    ros::Timer skillcallback;
 	skill_Detect* resultDetect = 0; 
     int trayID;
     string trayIDlist;
@@ -123,7 +119,7 @@ public:
     virtual string getSkillName() {return "PrepareLoad";}
 
     virtual void listSkill() {cout << "\t\t PrepareLoad  source floor = " << sourceFloor << endl;}
-    std::string sourceFloor;
+    std::string sourceFloor, direction;
     TCPSocket* tcpSocket;
 };
 

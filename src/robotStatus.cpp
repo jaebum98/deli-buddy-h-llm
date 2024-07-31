@@ -122,6 +122,7 @@ int robotStatus::setSkillInfo(string skill, int skillID)
     currentSkillID = skillID;
 }
 
+
 int robotStatus::setWholeSequence(Json::Value wholeSkills) // job 할당할 때, clear 할 때 호출
 { 
     if(wholeSkills.size() != 0)          wholeSequence = wholeSkills;   

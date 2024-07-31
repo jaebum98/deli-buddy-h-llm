@@ -4,11 +4,9 @@
 #include <map>
 #include "tcpsocket.hpp"
 #include <iostream>
-#include "task.h"
 #include <bitset>
-
 #include <cmath>
-
+// #include "task.h"
 #include <jsoncpp/json/json.h>
 #include <jsoncpp/json/writer.h>
 #include <task_manager_llm/robot_data.h>
@@ -152,6 +150,4 @@ private:
 
     int floor = -1;
     int manipModuleStatus = -1;
-
 };
-

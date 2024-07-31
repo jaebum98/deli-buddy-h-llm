@@ -58,7 +58,6 @@ taskManager::taskManager(ros::NodeHandle* nodehandle):nh_(*nodehandle)
         else if (rMessage["command"]=="reqStopWait")            onMessageRequestStopWait(rMessage); 
 
         else if (rMessage["command"]=="resPrepareLoad")         onMessageResponsePrepareLoad(tcpSocket);
-        else if (rMessage["command"]=="resRePrepareLoad")       onMessageResponseRePrepareLoad(tcpSocket);
         else if (rMessage["command"]=="resSwitchFloor")         onMessageResponseSwitchFloor(tcpSocket);
 
         else if (rMessage["command"]=="reqloadmap")             onMessageResponseLoadMap(rMessage);
@@ -139,11 +138,14 @@ void taskManager::initializeTimer() // timer변수를 taskmanager 멤버변수�
 {
     send_status_timer = nh_.createTimer(ros::Duration(1.0), &taskManager::sendStatusToServerCallback, this);
     serverconnect_timer = nh_.createTimer(ros::Duration(1.0), &taskManager::ServerConnectCallback, this);
+    skill_force_end_timer = nh_.createTimer(ros::Duration(5.0), &taskManager::SkillEndCallback, this);
+    skill_force_end_timer.stop(); // 즉시 정지
 }
 
 void taskManager::initializeSubscribers()
 {
     navi_status_sub = nh_.subscribe("/navistatus", 5, &taskManager::naviStatusCallback, this);
+    postbox_sub = nh_.subscribe("/service_vision/camera_left/camera_left/plane_estimation/postbox", 1, &taskManager::postboxCallback, this);
     left_pose_sub = nh_.subscribe("/service_vision/camera_left/camera_left/plane_estimation", 1, &taskManager::leftPoseCallback, this);
     right_pose_sub = nh_.subscribe("/service_vision/camera_right/camera_right/plane_estimation", 1, &taskManager::rightPoseCallback, this);
     arm_status_sub = nh_.subscribe("/arm_status", 10, &taskManager::armStatusCallback, this);
@@ -229,8 +231,9 @@ void taskManager::initializePublishers()
 {
     cmdGUI = nh_.advertise<std_msgs::String>("cmdGUI", 10, true);
     conaGo_pub = nh_.advertise<std_msgs::String>("/cona/cmd", 5, true);
+    pub_posebox = nh_.advertise<std_msgs::Bool>("/service_vision/camera_left/depth/request/postbox", 5, true);
     pub_left = nh_.advertise<std_msgs::Bool>("/service_vision/camera_left/depth/request", 5, true);
-    pub_right = nh_.advertise<std_msgs::Bool>("/service_vision/camera_right/depth/request", 1, true);
+    // pub_right = nh_.advertise<std_msgs::Bool>("/service_vision/camera_right/depth/request", 1, true);
     arm_pub = nh_.advertise<std_msgs::Float32MultiArray>("/arm/cmd", 1, true);
     deliverCheck_pub = nh_.advertise<std_msgs::String>("/service_vision/delivery_check", 1, true);
     emergency_pub = nh_.advertise<std_msgs::Bool>("/stop/request", 5, true); 
@@ -241,8 +244,9 @@ void taskManager::initializePublishers()
 
     mapPublishers["cmdGUI"] = &cmdGUI;
     mapPublishers["conaGo_pub"] = &conaGo_pub;
+    mapPublishers["pub_posebox"] = &pub_posebox;
     mapPublishers["pub_left"] = &pub_left;
-    mapPublishers["pub_right"] = &pub_right;
+    // mapPublishers["pub_right"] = &pub_right;
     mapPublishers["arm_pub"] = &arm_pub;
     mapPublishers["deliverCheck_pub"] = &deliverCheck_pub;
     mapPublishers["emergency_pub"] = &emergency_pub;
@@ -419,6 +423,26 @@ void taskManager::armStatusCallback(const std_msgs::Int32::ConstPtr& msg)
     
 }
 
+void taskManager::postboxCallback(const std_msgs::Int32::ConstPtr& msg)
+{
+    cout << "postboxCallback() callback" << endl;
+
+    if(emergencyFlag == true){
+        return;
+    }
+
+    Json::Value jsonData;
+    jsonData["type"] = "detect";
+    jsonData["direction"] = "left";
+    if (msg->data == 0) jsonData["result"] = "false";
+    else if (msg->data == 1) jsonData["result"] = "true";
+
+    if(callSkillCallback(jsonData) == -1){
+        return;
+    }
+    currentStatus.setSkillInfo(vectorSkill[currentSkill]->getSkillName(), currentSkill);
+}
+
 void taskManager::leftPoseCallback(const task_manager_llm::PlaneEstimation::ConstPtr& msg)
 {
     cout << "leftPoseCallback() callback" << endl;
@@ -560,6 +584,7 @@ int taskManager::clearSkills()
     vectorSkill.clear(); 
     taskListDelivery.clear(); 
     unique_trayID.clear();
+    skill_force_end_timer.stop();
     Json::Value noneSkill;
     currentStatus.setWholeSequence(noneSkill);
 
@@ -580,7 +605,6 @@ int taskManager::callSkillCallback(Json::Value s)
 
     // call skill callback
     int skillStatus = vectorSkill[currentSkill]->callback_skill(s); // step forward to next subtask
-
     if(skillStatus==0 && vectorSkill.size()==currentSkill+1){ // when last task finished, size of vectorSkill goes 0
         clearSkills();  
 
@@ -588,22 +612,43 @@ int taskManager::callSkillCallback(Json::Value s)
         std_msgs::String speakermp3;
         speakermp3.data = "home_arrived";
         mapPublishers["speaker_pub"]->publish(speakermp3);         
-        
+              
         currentStatus.setSkillInfo("", currentSkill); // 목록창 지울 때는 -1 전송
         currentStatus.setNotice("Task Done");    
         if (netstatus) // when network is alive,
         {
             sendSkillSeqToServer();
         }
-                     
+                       
         return -1;
     }
     else if (skillStatus==0) { // invoke next task
-        vectorSkill[currentSkill]->invoke_skill();
         currentSkill++;
+        vectorSkill[currentSkill]->invoke_skill();
+        cout << "626 : " << vectorSkill[currentSkill]->getSkillName() << " " << currentSkill << endl;
+        currentStatus.setSkillInfo(vectorSkill[currentSkill]->getSkillName(), currentSkill); 
+        // if (vectorSkill[currentSkill]->getSkillName() == "Manipulate") ManualEndSkill();
     }    
-
+    return 0;
 }
+
+void taskManager::SkillEndCallback(const ros::TimerEvent&)
+{    
+    Json::Value jsonData;
+    if (vectorSkill[currentSkill]->getSkillName() == "Manipulate") {
+        jsonData["type"] = "manipulate";    
+	    jsonData["status"] = "done";
+        if(callSkillCallback(jsonData) == -1){
+            return;
+        }
+        currentStatus.setSkillInfo(vectorSkill[currentSkill]->getSkillName(), currentSkill);
+        
+    }
+    
+
+    cout << "649 : " << currentSkill << endl;  
+}
+
 
 void taskManager::manualCommandCallback(const std_msgs::String::ConstPtr& msg)
 {
@@ -778,7 +823,8 @@ int taskManager::onMessageJobSequence(Json::Value &rMessage)
         }
         else if (infojs["skill"].asString() == "PrepareLoad"){
             cout << rMessage["js"][ii]["floor"] << endl;
-            infojs["sourceFloor"]  = rMessage["js"][ii]["floor"].asInt(); 
+            infojs["sourceFloor"]  = rMessage["js"][ii]["floor"].asInt();
+            infojs["direction"] = rMessage["js"][ii]["direction"].asString();/////////////////////////////
         }
         else if (infojs["skill"].asString() == "DecideLoad"){
             
@@ -845,12 +891,15 @@ int taskManager::onMessageRequestStart(TCPSocket* tcpSocket)
     speakermp3.data = "TaskStart";
     mapPublishers["speaker_pub"]->publish(speakermp3); 
     currentSkill = 0; // task 시작
-    vectorSkill[currentSkill]->invoke_skill();    
+    vectorSkill[currentSkill]->invoke_skill();
+
     cout << "currentSkill = " << vectorSkill[currentSkill]->getSkillName() << endl;
     cout << "currentSkillID = " << currentSkill << endl;
  
     currentStatus.setSkillInfo(vectorSkill[currentSkill]->getSkillName(), currentSkill);
     currentStatus.setNotice("Task Start");
+
+    // if (vectorSkill[currentSkill]->getSkillName() == "Manipulate") ManualEndSkill(); // manipulate 는 5초뒤에 종료
 
     return 0;
 }
@@ -922,22 +971,6 @@ int taskManager::onMessageResponsePrepareLoad(TCPSocket* tcpSocket)
     }
     currentStatus.setSkillInfo(vectorSkill[currentSkill]->getSkillName(), currentSkill);
 
-}
-
-int taskManager::onMessageResponseRePrepareLoad(TCPSocket* tcpSocket)
-{
-    Json::Value jsonData;
-    jsonData["type"] = "RePrepareLoad";
-    jsonData["status"] = naviStatus;
-    jsonData["data"] = evobs;
-    cout << "response reprepareload!!!" << endl;
-    Json::StreamWriterBuilder writer;
-    std::string jsonstring = Json::writeString(writer, jsonData);
-
-    if(callSkillCallback(jsonData) == -1){
-        return 0;
-    }
-    currentStatus.setSkillInfo(vectorSkill[currentSkill]->getSkillName(), currentSkill);
 }
 
 
@@ -1322,7 +1355,7 @@ int taskManager::addSkill_Manipulate(Json::Value params, taskManager* pt){
     }
     else {
         skill_Manipulate* skill = new skill_Manipulate;
-        skill->set_skill(params,pt->mapPublishers);//, &pt->pub_left, &pt->pub_right, &pt->conaGo_pub);
+        skill->set_skill(params,pt->mapPublishers, pt->skill_force_end_timer);//, &pt->pub_left, &pt->pub_right, &pt->conaGo_pub);
         pt->vectorSkill.push_back(skill);
     }
     
@@ -1340,9 +1373,8 @@ int taskManager::addSkill_SetEvEms(Json::Value params, taskManager* pt){ //pt : 
 }
 
 
-
 int taskManager::addSkill_PrepareLoad(Json::Value params, taskManager* pt){
-    cout << "Source Floor = " << params["sourceFloor"].asInt() << endl;
+    cout << "Source Floor = " << params["sourceFloor"].asInt() << "Direction = " << params["direction"].asString() << endl;
     skill_PrepareLoad* skill = new skill_PrepareLoad;
     skill->set_skill(params,pt->mapPublishers, pt->tcpSocket);
     pt->vectorSkill.push_back(skill);

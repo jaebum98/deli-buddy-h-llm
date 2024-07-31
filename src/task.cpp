@@ -70,23 +70,23 @@ int skill_Detect::invoke_skill() {
     status = 1;
     std_msgs::Bool msgJS;
     msgJS.data = false;
-    if(request_side == 0)
-    {
-        cout << "0" << request_side << endl;
-        mPublishers["pub_left"]->publish(msgJS);
-    }
-    else if(request_side == 1)
-    {
-        cout << "1" << request_side << endl;
-        mPublishers["pub_right"]->publish(msgJS);
-    }
-    else if(request_side == 2)
-    {
-        cout << "2" << request_side << endl;
-        mPublishers["pub_left"]->publish(msgJS);
-        mPublishers["pub_right"]->publish(msgJS);
-    }
-
+    // if(request_side == 0)
+    // {
+    //     cout << "0" << request_side << endl;
+    //     mPublishers["pub_left"]->publish(msgJS);
+    // }
+    // else if(request_side == 1)
+    // {
+    //     cout << "1" << request_side << endl;
+    //     mPublishers["pub_right"]->publish(msgJS);
+    // }
+    // else if(request_side == 2)
+    // {
+    //     cout << "2" << request_side << endl;
+    //     mPublishers["pub_left"]->publish(msgJS);
+    //     mPublishers["pub_right"]->publish(msgJS);
+    // }
+    mPublishers["pub_posebox"]->publish(msgJS); // 고하중 로봇
 }
 int skill_Detect::callback_skill(Json::Value js){
     string msgfrom  = js["type"].asString();
@@ -95,35 +95,36 @@ int skill_Detect::callback_skill(Json::Value js){
         status = 0;
         cout << "skill_Detect::callback_skill(Json::Value js) : arrived"  << endl;
 
-        // store data (maybe for later use)
-        string side = js["direction"].asString();
-        if (side=="left") {
-            if (request_side==1) {
-                cout << "skill_Detect::callback_skill;; something wrong. right side requested, but left gives the answer." << endl;
-            }
-            detected_side = 0;
-        }
-        if (side=="right") {
-            if (request_side==0) {
-                cout << "skill_Detect::callback_skill;; something wrong. left side requested, but right gives the answer." << endl;
-            }
-            detected_side = 1;
-        }
-        if(js["orientation"][0].asFloat() == 0 || js["position"][0].asFloat() <= 0){
-            status = 3;
-            std_msgs::String speakermp3;
-            speakermp3.data = "delivery_fail";
-            mPublishers["speaker_pub"]->publish(speakermp3);
-        }
-        else {
-            msgr.pose.position.x =js["position"][0].asFloat();
-            msgr.pose.position.y =js["position"][1].asFloat();
-            msgr.pose.position.z =js["position"][2].asFloat();
-            msgr.pose.orientation.w = js["orientation"][0].asFloat();
-            msgr.pose.orientation.x = js["orientation"][1].asFloat();
-            msgr.pose.orientation.y = js["orientation"][2].asFloat();
-            msgr.pose.orientation.z = js["orientation"][3].asFloat();
-        }
+        // // store data (maybe for later use)
+        // string side = js["direction"].asString();
+        // if (side=="left") {
+        //     if (request_side==1) {
+        //         cout << "skill_Detect::callback_skill;; something wrong. right side requested, but left gives the answer." << endl;
+        //     }
+        //     detected_side = 0;
+        // }
+        // else if (side=="right") {
+        //     if (request_side==0) {
+        //         cout << "skill_Detect::callback_skill;; something wrong. left side requested, but right gives the answer." << endl;
+        //     }
+        //     detected_side = 1;
+        // }
+        // if(js["orientation"][0].asFloat() == 0 || js["position"][0].asFloat() <= 0){
+        //     status = 3;
+        //     std_msgs::String speakermp3;
+        //     speakermp3.data = "delivery_fail";
+        //     mPublishers["speaker_pub"]->publish(speakermp3);
+        // }
+        // else {
+        //     msgr.pose.position.x =js["position"][0].asFloat();
+        //     msgr.pose.position.y =js["position"][1].asFloat();
+        //     msgr.pose.position.z =js["position"][2].asFloat();
+        //     msgr.pose.orientation.w = js["orientation"][0].asFloat();
+        //     msgr.pose.orientation.x = js["orientation"][1].asFloat();
+        //     msgr.pose.orientation.y = js["orientation"][2].asFloat();
+        //     msgr.pose.orientation.z = js["orientation"][3].asFloat();
+        // }
+
     }
     
     else {
@@ -135,9 +136,10 @@ int skill_Detect::callback_skill(Json::Value js){
 
 // -------------------------------------------------------------------------------------- //
 
-int skill_Manipulate::set_skill(Json::Value js, map<string,ros::Publisher*> mPubs){
+int skill_Manipulate::set_skill(Json::Value js, map<string,ros::Publisher*> mPubs, ros::Timer scall){
     skillBase::set_skill(js, mPubs);    
     trayID = stoi(js["tray"].asString());
+    skillcallback = scall;
 }
 
 int skill_Manipulate::invoke_skill(){
@@ -163,7 +165,9 @@ int skill_Manipulate::invoke_skill(){
     array.data.push_back(trayArray[1]);
     array.data.push_back(trayArray[2]);
     array.data.push_back(1.0);
-    mPublishers["arm_pub"]->publish(array);
+    skillcallback.start();
+    // mPublishers["arm_pub"]->publish(array);
+    // taskmanager.ManualEndSkill();
 }
 
 int skill_Manipulate::callback_skill(Json::Value js){
@@ -180,7 +184,8 @@ int skill_Manipulate::callback_skill(Json::Value js){
         delCheck << "delivery_check";
 
         delCheckMsg.data = delCheck.str();
-        mPublishers["deliverCheck_pub"]->publish(delCheckMsg);
+        skillcallback.stop();
+        // mPublishers["deliverCheck_pub"]->publish(delCheckMsg);
         sleep(1);
     }
     else {
@@ -195,6 +200,7 @@ int skill_Manipulate::callback_skill(Json::Value js){
 int skill_PrepareLoad::set_skill(Json::Value js, map<string,ros::Publisher*> mPubs, TCPSocket* ts){
     skillBase::set_skill(js, mPubs);
     sourceFloor = js["sourceFloor"].asString(); // 3
+    direction = js["direction"].asString();
     tcpSocket = ts;
 }
 
@@ -211,8 +217,9 @@ int skill_PrepareLoad::invoke_skill(){
     mPublishers["speaker_pub"]->publish(speakermp3);
  
     Json::Value sendbuffer;
-    sendbuffer["data"] = "prepareLoad";
+    sendbuffer["data"] = "PrepareLoad";
     sendbuffer["source"] = sourceFloor;
+    sendbuffer["dir"] = direction;
     sendbuffer["lk"] = "pandemic201";
     Json::Value jsonData;
     jsonData["type"] = "evReq";
@@ -324,18 +331,18 @@ int skill_DecideLoad::callback_skill(Json::Value js){
     msgstatus = js["status"].asString();
     
     if (msgstatus=="stop-ems") {
-        if (checkEVClose == false) {
-            if(checkperson == false) {
-                distances.push_back(distance);
-                if(distances.size() == 5) checkperson = true;
-            }
-            else {
-                cout << "start to check person!" << endl;
-                int count = 0;
-                for (size_t i = 0; i < distances.size(); i++){
-                    if (distance >= 2400) count ++;
-                }
-                if (count >= 3) {
+        // if (checkEVClose == false) {
+        //     if(checkperson == false) {
+        //         distances.push_back(distance);
+        //         if(distances.size() == 5) checkperson = true;
+        //     }
+        //     else {
+        //         cout << "start to check person!" << endl;
+        //         int count = 0;
+        //         for (size_t i = 0; i < distances.size(); i++){
+        //             if (distance >= 2400) count ++;
+        //         }
+                // if (count >= 3) {
                     status = 0;
                     cout << "skill_DecideLoad::callback_skill(Json::Value js) : no person"  << endl;
                     distances.clear();
@@ -343,71 +350,71 @@ int skill_DecideLoad::callback_skill(Json::Value js){
                     speakermp3.data = "ev_decide_no_obs";
                     mPublishers["speaker_pub"]->publish(speakermp3); 
                     checkperson = false;
-                }
-                else {
-                    cout << "skill_DecideLoad::callback_skill(Json::Value js) : person"  << endl;
-                    Json::Value sendbuffer;
-                    sendbuffer["data"] = "closeDoor";
-                    sendbuffer["lk"] = "pandemic201";
-                    Json::Value jsonData;
-                    jsonData["type"] = "evReq";
-                    jsonData["content"] = sendbuffer;
-                    Json::StreamWriterBuilder writer;
-                    std::string jsonstring = Json::writeString(writer, jsonData);
-                    // std::cout << jsonstring << std::endl;
-                    tcpSocket->SendJson(jsonstring);
-                    distances.clear();
-                    checkperson = false;
-                    checkEVClose = true;
+                // }
+            //     else {
+            //         cout << "skill_DecideLoad::callback_skill(Json::Value js) : person"  << endl;
+            //         Json::Value sendbuffer;
+            //         sendbuffer["data"] = "closeDoor";
+            //         sendbuffer["lk"] = "pandemic201";
+            //         Json::Value jsonData;
+            //         jsonData["type"] = "evReq";
+            //         jsonData["content"] = sendbuffer;
+            //         Json::StreamWriterBuilder writer;
+            //         std::string jsonstring = Json::writeString(writer, jsonData);
+            //         // std::cout << jsonstring << std::endl;
+            //         tcpSocket->SendJson(jsonstring);
+            //         distances.clear();
+            //         checkperson = false;
+            //         checkEVClose = true;
 
-                    std_msgs::String speakermp3;
-                    speakermp3.data = "ev_decide_obs";
-                    mPublishers["speaker_pub"]->publish(speakermp3); 
-                }
-            } 
-        }
-        else {
-            cout << "start ev status request" << endl;
-            if (doorcheck1 == false){
-                Json::Value sendbuffer;
-                sendbuffer["data"] = "ReqEVstatus"; //ev문이 닫혔는지 아닌지 알기 위해 요청
-                sendbuffer["lk"] = "pandemic201";
-                Json::Value jsonData;
-                jsonData["type"] = "evReq";
-                jsonData["content"] = sendbuffer;
-                Json::StreamWriterBuilder writer;
-                std::string jsonstring = Json::writeString(writer, jsonData);
-                tcpSocket->SendJson(jsonstring);
-            }
+            //         std_msgs::String speakermp3;
+            //         speakermp3.data = "ev_decide_obs";
+            //         mPublishers["speaker_pub"]->publish(speakermp3); 
+            //     }
+            // } 
+        // }
+        // else {
+        //     cout << "start ev status request" << endl;
+        //     if (doorcheck1 == false){
+        //         Json::Value sendbuffer;
+        //         sendbuffer["data"] = "ReqEVstatus"; //ev문이 닫혔는지 아닌지 알기 위해 요청
+        //         sendbuffer["lk"] = "pandemic201";
+        //         Json::Value jsonData;
+        //         jsonData["type"] = "evReq";
+        //         jsonData["content"] = sendbuffer;
+        //         Json::StreamWriterBuilder writer;
+        //         std::string jsonstring = Json::writeString(writer, jsonData);
+        //         tcpSocket->SendJson(jsonstring);
+        //     }
 
-            if (msgfrom == "RePrepareLoad") {
-                doorcheck1 = true;
-                cout << "door closed based server" << endl;
-            }
+        //     if (msgfrom == "RePrepareLoad") {
+        //         doorcheck1 = true;
+        //         cout << "door closed based server" << endl;
+        //     }
             
-            if (doorcheck2 == false) distances.push_back(distance); // save distance
-            cout << msgfrom << endl;
-            cout << distance << endl;
-            if(distances.size() == 7){
-                cout << "check distance" << endl;
-                int count = 0;
-                for (size_t i = 0; i < distances.size(); i++){
-                    if(distance < 8000 && distance > 0) count++;
-                }
-                if (count >= 4) {
-                    cout << "door closed based distance" << endl;
-                    doorcheck2 = true;
-                }
-                distances.clear(); // 다시 계산
-            }
-            if(doorcheck1 == true && doorcheck2 == true) {
-                status = 2;
-                cout << "skill_DecideLoad::callback_skill(Json::Value js) : RePrepareLoad"  << endl;
-                checkEVClose = false;
-                doorcheck1 = false;
-                doorcheck2 = false;
-            }
-        }
+        //     if (doorcheck2 == false) distances.push_back(distance); // save distance
+        //     cout << msgfrom << endl;
+        //     cout << distance << endl;
+        //     if(distances.size() == 7){
+        //         cout << "check distance" << endl;
+        //         int count = 0;
+        //         for (size_t i = 0; i < distances.size(); i++){
+        //             if(distance < 8000 && distance > 0) count++;
+        //         }
+        //         if (count >= 4) {
+        //             cout << "door closed based distance" << endl;
+        //             doorcheck2 = true;
+        //         }
+        //         distances.clear(); // 다시 계산
+        //     }
+        //     if(doorcheck1 == true && doorcheck2 == true) {
+        //         status = 2;
+        //         cout << "skill_DecideLoad::callback_skill(Json::Value js) : RePrepareLoad"  << endl;
+        //         checkEVClose = false;
+        //         doorcheck1 = false;
+        //         doorcheck2 = false;
+        //     }
+        // }
     }
     else {
         cout << "skill_DecideLoad::callback_skill::::ignore message" << endl;
@@ -448,7 +455,7 @@ int skill_SwitchFloor::invoke_skill(){
     mPublishers["speaker_pub"]->publish(speakermp3);
 
     Json::Value sendbuffer;
-    sendbuffer["data"] = "switchFloor"; 
+    sendbuffer["data"] = "SwitchFloor"; 
     sendbuffer["lk"] = "pandemic201";
     Json::Value jsonData;
     jsonData["type"] = "evReq";
@@ -456,7 +463,7 @@ int skill_SwitchFloor::invoke_skill(){
     Json::StreamWriterBuilder writer;
     std::string jsonstring = Json::writeString(writer, jsonData);
 
-    // std::cout << jsonstring << std::endl;
+    std::cout << jsonstring << std::endl;
     tcpSocket->SendJson(jsonstring);
 }
 
