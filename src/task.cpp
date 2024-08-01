@@ -456,6 +456,7 @@ int skill_SwitchFloor::invoke_skill(){
 
     Json::Value sendbuffer;
     sendbuffer["data"] = "SwitchFloor"; 
+    sendbuffer["target"] = targetFloor;
     sendbuffer["lk"] = "pandemic201";
     Json::Value jsonData;
     jsonData["type"] = "evReq";
